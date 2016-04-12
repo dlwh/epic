@@ -237,7 +237,7 @@ FLit3    = [0-9]+
 Exponent = [eE] [+-]? [0-9]+
 
 // punctuation
-P	         = ("_"|"-"|"."|",")
+P	         = ("_"|"-"|"."|",")|{SLASH}
 
 Q = [’'`]
 
@@ -292,9 +292,6 @@ ABBR = ({ABBR_TITLE}|{ABBR_GEN})
 
 
 // dates and fractions
-[:digit:]+ / {SLASH}                              { return currentToken(); }
-{SLASH} / [:digit:]                              { return  currentToken(); }
-
 
 <POLISH_CONDITIONAL_MODE>{POLISH_CONDITIONAL_CLITIC} / {POLISH_CONDITIONAL_ENDING}                                      { yybegin(YYINITIAL); return currentToken(); }
 <POLISH_CONDITIONAL_MODE>[^b].                                        { throw new RuntimeException("..." + currentToken());}

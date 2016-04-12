@@ -89,9 +89,9 @@ class TreebankTokenizerTest  extends FunSuite {
   }
 
   test("dates and fractions") {
-    assert(TreebankTokenizer("4/18").toList === List("4","/", "18"))
-    assert(TreebankTokenizer("12/31").toList === List("12","/", "31"))
-    assert(TreebankTokenizer("1/3").toList === List("1","/", "3"))
+    assert(TreebankTokenizer("4/18").toList === List("4/18"))
+    assert(TreebankTokenizer("12/31").toList === List("12/31"))
+    assert(TreebankTokenizer("1/3").toList === List("1/3"))
   }
 
   test("negatives") {
