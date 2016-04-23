@@ -11,8 +11,7 @@ import scala.util.hashing.MurmurHash3
  **/
 final class LRUCache[@specialized(Int, Long) K:ClassTag, V:ClassTag](size: Int, onEvict: (K, V)=>Unit = (k: K, v: V) => ()) {
   private val keys = new Array[K](size)
-  private val occupied = new Array[Int](size)
-  java.util.Arrays.fill(occupied, -1)
+  private val occupied = Array.fill[Int](size)(-1)
   private var nextKey = 0
   private val values = new Array[V](size)
 

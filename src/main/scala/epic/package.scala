@@ -115,4 +115,15 @@ package object epic {
     }
   }
 
+  implicit class AwesomeArrayOps(val xs: Array.type) {
+    def fillWith[T : Manifest](size: Int)(f: Int => T): Array[T] = {
+      var i = 0
+      Array.fill[T](size) {
+        val x = f(i)
+        i += 1
+        x
+      }
+    }
+  }
+
 }

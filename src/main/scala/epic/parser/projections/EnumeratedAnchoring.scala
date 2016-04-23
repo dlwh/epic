@@ -191,8 +191,7 @@ case class EnumeratedAnchoring[L, W](topology: RuleTopology[L],
   }
 
   // (1 entry for each position (a split point), an entry has a rule index, a begin/end pair, and a score
-  private val cache = new Array[Int](length * (1 + 1 + 2))
-  util.Arrays.fill(cache, -1) //
+  private val cache = Array.fill[Int](length * (1 + 1 + 2))(-1)
 
   private def checkCache(splitPoint: Int, rule: Int, ti: Int) = {
     val crule = cache(splitPoint * 4)

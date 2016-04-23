@@ -1,4 +1,5 @@
-package epic.features
+package epic
+package features
 
 import epic.framework.Feature
 import breeze.util.Index
@@ -32,19 +33,12 @@ class ZeroRuleAndSpansFeaturizer[W]() extends RuleAndSpansFeaturizer[W] {
 
 object RuleAndSpansFeaturizer {
   
-  def indexAndOffset(index: Index[Feature], feats: Array[Feature], offset: Int): Array[Int] = {
-    val indexedArr = new Array[Int](feats.size);
-    var i = 0;
-    while (i < feats.size) {
-      indexedArr(i) = index(feats(i)) + offset;
-      i += 1;
-    }
-    indexedArr;
-  }
-  
+  def indexAndOffset(index: Index[Feature], feats: Array[Feature], offset: Int): Array[Int] =
+    Array.fillWith[Int](feats.length)(i => index(feats(i)) + offset)
+
   def addToIndex(index: MutableIndex[Feature], feats: Array[Feature]) {
     var i = 0;
-    while (i < feats.size) {
+    while (i < feats.length) {
       index.index(feats(i));
       i += 1;
     }

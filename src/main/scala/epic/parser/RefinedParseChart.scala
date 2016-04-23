@@ -258,29 +258,15 @@ object RefinedParseChart {
   // those were showing up in the profile.
 
   private def mkGrammarVector(grammarSize: Int, fill: Double) = {
-    val arr = new Array[Double](grammarSize)
-    Arrays.fill(arr, fill)
-    arr
+    Array.fill(grammarSize)(fill)
   }
 
   private def mkBitSetArray(grammarSize: Int) = {
-    val arr = new Array[collection.mutable.BitSet](grammarSize)
-    var i = 0
-    while (i < arr.length) {
-      arr(i) = new collection.mutable.BitSet()
-      i += 1
-    }
-    arr
+    Array.fill[collection.mutable.BitSet](grammarSize)(collection.mutable.BitSet())
   }
 
   private def mkRefinementArray(length: Int, grammarSize: Int): Array[Array[BitSet]] = {
-    val arr = new Array[Array[BitSet]](length)
-    var i = 0
-    while (i < arr.length) {
-      arr(i) = mkBitSetArray(grammarSize)
-      i += 1
-    }
-    arr
+    Array.fill[Array[BitSet]](length)(mkBitSetArray(grammarSize))
   }
 
 
@@ -290,16 +276,11 @@ object RefinedParseChart {
     while (pos < len) {
       var l = 0
       while(l < refinementsFor.length) {
-        val myArr = new Array[Int](refinementsFor(l))
-        util.Arrays.fill(myArr, fillValue)
-        arr(pos)(l) = myArr
+        arr(pos)(l) = Array.fill[Int](refinementsFor(l))(fillValue)
         l += 1
       }
-
       pos += 1
     }
-
-
     arr
   }
 }

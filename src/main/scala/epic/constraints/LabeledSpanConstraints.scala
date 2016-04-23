@@ -155,21 +155,12 @@ object LabeledSpanConstraints {
         case true =>
           import in._
           val length = readInt()
-          val maxLengthsForPosition = new Array[Int](length)
-          if(length < Byte.MaxValue) {
-            for(i <- 0 until length) {
-              maxLengthsForPosition(i) = readByte()
-            }
-          } else {
-            for(i <- 0 until length) {
-              maxLengthsForPosition(i) = readInt()
-            }
-          }
+          val maxLengthsForPosition: Array[Int] = if (length < Byte.MaxValue)
+            Array.fill(length)(readByte())
+          else
+            Array.fill(length)(readInt())
           val labelLen = in.readInt()
-          val maxLengthsForLabel = new Array[Int](labelLen)
-          for(i <- 0 until maxLengthsForLabel.length) {
-            maxLengthsForLabel(i) = in.readInt()
-          }
+          val maxLengthsForLabel = Array.fill(labelLen)(in.readInt())
           val spans = new TriangularArray[util.BitSet](length+1)
           var ok = true
           while(ok) {
@@ -363,30 +354,14 @@ object LabeledSpanConstraints {
     // could avoid the allocation, but whatever.
     if(a.length < b.length) elementwiseMax(util.Arrays.copyOf(a, b.length), b)
     else if(b.length < a.length) elementwiseMax(a, util.Arrays.copyOf(b, a.length))
-    else {
-      val result = new Array[Int](a.length)
-      var i = 0
-      while(i < result.length) {
-        result(i) = math.max(a(i), b(i))
-        i += 1
-      }
-      result
-    }
+    else Array.fillWith[Int](a.length)(i => math.max(a(i), b(i)))
   }
 
   private def elementwiseMin(a: Array[Int], b: Array[Int]):Array[Int] = {
     // could avoid the allocation, but whatever.
     if(a.length < b.length) elementwiseMin(util.Arrays.copyOf(a, b.length), b)
     else if(b.length < a.length) elementwiseMin(a, util.Arrays.copyOf(b, a.length))
-    else {
-      val result = new Array[Int](a.length)
-      var i = 0
-      while(i < result.length) {
-        result(i) = math.min(a(i), b(i))
-        i += 1
-      }
-      result
-    }
+    else Array.fillWith[Int](a.length)(i => math.min(a(i), b(i)))
   }
 
 }

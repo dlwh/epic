@@ -551,28 +551,11 @@ final class LexGrammar[L, L2, W](val topology: RuleTopology[L],
        val lexicalizedRefinements = if(isHeadOnLeftForRule(rule)) {
          val head = unaryHeadIndex(parentRef)
           //        val x = Array.range(0,numValidRuleRefinements(rule)).filter(x => leftChildRefinement(rule,x) == parentRef && rightChildRefinement(rule, x) > parentRef && rightChildRefinement(rule, x) < end)
-          val result = new Array[Int](end - (head+1))
-          var ref = head * words.length + head + 1
-          var i = 0
-          while(i < result.length) {
-            result(i) = ref
-            ref += 1
-            i += 1
-          }
-          result
+         Array.fillWith[Int](end - (head + 1)) { i => head * words.length + head + 1 + i }
         } else {
          val head = unaryHeadIndex(parentRef)
           //        val x = Array.range(0,numValidRuleRefinements(rule)).filter(x => rightChildRefinement(rule,x) == parentRef && leftChildRefinement(rule, x) < parentRef && leftChildRefinement(rule, x) >= begin)
-          val result = new Array[Int](head - begin)
-          var ref = head * words.length + begin
-          var i = 0
-          while(i < result.length) {
-            result(i) = ref
-            i += 1
-            ref += 1
-          }
-          //        assert(x.toSet == result.toSet)
-          result
+         Array.fillWith[Int](head - begin) { i => head * words.length + begin + i }
         }
          val ruleRefs = refinements.ruleRefinementsCompatibleWithParentRef(rule, tagRef(parentRef))
 
@@ -580,7 +563,6 @@ final class LexGrammar[L, L2, W](val topology: RuleTopology[L],
       }
 
     }
-
 
     override def validRuleRefinementsGivenParent(begin: Int, splitBegin: Int, splitEnd: Int, end: Int, rule: Int, parentRef: Int): Array[Int] = {
       if(!binaries(rule)) {
@@ -600,15 +582,7 @@ final class LexGrammar[L, L2, W](val topology: RuleTopology[L],
           //
           if(splitEnd <= headIndex) return Array.empty
           val firstPossibleStart = math.max(headIndex +1, splitBegin)
-          val result = new Array[Int](end - firstPossibleStart)
-          var ref = headIndex * words.length + firstPossibleStart
-          var i = 0
-          while(i < result.length) {
-            result(i) = ref
-            ref += 1
-            i += 1
-          }
-          result
+          Array.fillWith[Int](end - firstPossibleStart)(i => headIndex * words.length + firstPossibleStart + i)
         } else {
           // if the head is on the right, then the dependent
           // can be in (begin until math.min(splitEnd,ref1))
@@ -620,15 +594,7 @@ final class LexGrammar[L, L2, W](val topology: RuleTopology[L],
           //
           if(splitBegin >= headIndex) return Array.empty
           val lastPossibleEnd = math.min(headIndex, splitEnd)
-          val result = new Array[Int](lastPossibleEnd - begin)
-          var ref = headIndex * words.length + begin
-          var i = 0
-          while(i < result.length) {
-            result(i) = ref
-            i += 1
-            ref += 1
-          }
-          result
+          Array.fillWith[Int](lastPossibleEnd - begin)(i => headIndex * words.length + begin + i)
         }
 
         if(lexicalizedRefinements.isEmpty) {
@@ -642,57 +608,21 @@ final class LexGrammar[L, L2, W](val topology: RuleTopology[L],
     }
 
     def validRuleRefinementsGivenLeftChild(begin: Int, split: Int, completionBegin:Int, completionEnd: Int, rule: Int, lcRef: Int) = {
-      val lexicalizedRefinements = if(isHeadOnLeftForRule(rule)) {
-        val result = new Array[Int](completionEnd - split)
-        val lc = unaryHeadIndex(lcRef)
-        var ref = lc * words.length + split
-        var i = 0
-        while(i < result.length) {
-          result(i) = ref
-          ref += 1
-          i += 1
-        }
-        result
-      } else {
-        val lc = unaryHeadIndex(lcRef)
-        val result = new Array[Int](completionEnd - split)
-        var ref = split * words.length + lc
-        var i = 0
-        while(i < result.length) {
-          result(i) = ref
-          i += 1
-          ref += words.length
-        }
-        result
-      }
+      val lc = unaryHeadIndex(lcRef)
+      val lexicalizedRefinements = if(isHeadOnLeftForRule(rule))
+        Array.fillWith[Int](completionEnd - split)(i => lc * words.length + split + i)
+      else
+        Array.fillWith[Int](completionEnd - split)(i => (split + i) * words.length + lc)
       val ruleRefs = refinements.ruleRefinementsCompatibleWithLeftRef(rule, tagRef(lcRef))
       joinBinaryRuleRefs(lexicalizedRefinements, ruleRefs)
     }
 
-
     def validRuleRefinementsGivenRightChild(completionBegin: Int, completionEnd: Int, split: Int, end: Int, rule: Int, rcRef: Int): Array[Int] = {
       val rc = unaryHeadIndex(rcRef)
-      val lexicalizedRefinements = if(!isHeadOnLeftForRule(rule)) {
-        val result = new Array[Int](split - completionBegin)
-        var ref = rc * words.length + completionBegin
-        var i = 0
-        while(i < result.length) {
-          result(i) = ref
-          ref += 1
-          i += 1
-        }
-        result
-      } else {
-        val result = new Array[Int](split - completionBegin)
-        var ref = completionBegin * words.length + rc
-        var i = 0
-        while(i < result.length) {
-          result(i) = ref
-          i += 1
-          ref += words.length
-        }
-        result
-      }
+      val lexicalizedRefinements = if(!isHeadOnLeftForRule(rule))
+        Array.fillWith[Int](split - completionBegin)(i => rc * words.length + completionBegin + i)
+      else
+        Array.fillWith[Int](split - completionBegin)(i => (completionBegin + i) * words.length + rc)
       val ruleRefs = refinements.ruleRefinementsCompatibleWithRightRef(rule, tagRef(rcRef))
       joinBinaryRuleRefs(lexicalizedRefinements, ruleRefs)
     }
@@ -702,7 +632,6 @@ final class LexGrammar[L, L2, W](val topology: RuleTopology[L],
       val ruleRefs = refinements.ruleRefinementsCompatibleWithChildRef(rule, tagRef(childRef))
       joinUnaryRuleRefs(lexicalizedRefinements, ruleRefs)
     }
-
 
     def leftChildRefinement(rule: Int, ruleRef: Int) = {
       val word = if(isHeadOnLeftForRule(rule)) {
