@@ -29,7 +29,7 @@ class WordPrefixFeaturizer(wordCounts: Counter[String, Double], prefixOrder: Int
   def anchor(w: IndexedSeq[String]): WordFeatureAnchoring[String] = new WordFeatureAnchoring[String] {
     def words: IndexedSeq[String] = w
     val indices = words.map(wordIndex)
-    val myFeatures = (0 until words.length).map(i => if (indices(i) < 0) featuresFor(words(i)).toArray else knownWordFeatures(indices(i)))
+    val myFeatures = words.indices.map(i => if (indices(i) < 0) featuresFor(words(i)).toArray else knownWordFeatures(indices(i)))
     def featuresForWord(pos: Int): Array[Feature] = {
       myFeatures(pos)
     }

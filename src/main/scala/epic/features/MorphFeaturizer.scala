@@ -16,13 +16,13 @@ class MorphFeaturizer private (morphLookupTable: MorphFeaturizer.MorphLookupTabl
   def anchor(w: IndexedSeq[String]): WordFeatureAnchoring[String] = new WordFeatureAnchoring[String] {
     val morphFeats = if (!morphLookupTable.contains(w)) {
       println("Sentence wasn't found in lookup table: " + w);
-      (0 until w.size).map(i => Array[MorphFeat]());
+      w.indices.map(i => Array[MorphFeat]())
     } else {
       morphLookupTable(w);
     }
-    val feats = (0 until w.size).map(i => morphFeats(i).filter(feat => feat.label == "lem").map(feat => IndicatorFeature(feat): Feature))
 //    logger.info("Feats for sentence: " + w);
 //    (0 until w.size).foreach(i => logger.info(w(i) + ": " + feats(i).toSeq));
+    val feats = w.indices.map(i => morphFeats(i).filter(feat => feat.label == "lem").map(feat => IndicatorFeature(feat): Feature))
 
     def featuresForWord(pos: Int): Array[Feature] = if(pos < 0 || pos >= w.length) Array(BeginSentFeature) else feats(pos)
 

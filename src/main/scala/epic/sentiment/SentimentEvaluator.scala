@@ -80,16 +80,16 @@ object SentimentEvaluator {
   }
   
   def accuracy(mat: Array[Array[Int]]) = {
-    val numer = (0 until mat.size).map(i => mat(i)(i)).reduce(_+_);
-    val denom = (0 until mat.size).map(i => mat(i).reduce(_+_)).reduce(_+_);
+    val numer = mat.indices.map(i => mat(i)(i)).reduce(_+_);
+    val denom = mat.indices.map(i => mat(i).reduce(_+_)).reduce(_+_);
     renderNumerDenom(numer, denom);
   }
   
   def accuracy(mat: Array[Array[Int]], isCorrect: (Int, Int) => Boolean, isUsed: (Int, Int) => Boolean) = {
-    val numer = (0 until mat.size).map(i => (0 until mat(i).size).map(j => {
+    val numer = mat.indices.map(i => mat(i).indices.map(j => {
       if (isUsed(i, j) && isCorrect(i, j)) mat(i)(j) else 0
     }).reduce(_+_)).reduce(_+_);
-    val denom = (0 until mat.size).map(i => (0 until mat(i).size).map(j => {
+    val denom = mat.indices.map(i => mat(i).indices.map(j => {
       if (isUsed(i, j)) mat(i)(j) else 0
     }).reduce(_+_)).reduce(_+_);
     renderNumerDenom(numer, denom);

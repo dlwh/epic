@@ -37,7 +37,7 @@ object Word2Vec {
     for (word <- voc) {
       val containedInSome = vectorsEachSource.map(_.keySet.contains(word)).reduce(_ || _)
       val vector = if (containedInSome) {
-        var finalVector = (0 until vectorsEachSource.size).map(i => vectorsEachSource(i).getOrElse(word, { Array.tabulate(dimsEachSource(i))(j => 0.0F) })).reduce(_ ++ _)
+        var finalVector = vectorsEachSource.indices.map(i => vectorsEachSource(i).getOrElse(word, { Array.tabulate(dimsEachSource(i))(j => 0.0F) })).reduce(_ ++ _)
         if (inputVectorBias) {
           finalVector = finalVector ++ Array(1.0F) 
         }

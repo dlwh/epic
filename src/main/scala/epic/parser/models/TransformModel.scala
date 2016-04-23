@@ -140,7 +140,7 @@ object TransformModel {
         }
       }
 
-      for(i <- 0 until states.length) {
+      states.indices.foreach { i =>
         checkFlush(-1, i, -1) // force a flush
       }
     }

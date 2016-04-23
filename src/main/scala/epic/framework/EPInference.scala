@@ -43,7 +43,7 @@ class EPInference[Datum, Augment <: AnyRef](val inferences: IndexedSeq[Projectab
   // ugh code duplication...
   def goldMarginal(scorer: Scorer, datum: Datum, augment: Augment): Marginal = {
     if(!epInGold) {
-      val marginals = for(i <- 0 until inferences.length) yield {
+      val marginals = inferences.indices.map { i =>
         val inf = inferences(i)
         if(inf eq null)
           null.asInstanceOf[ProjectableInference[Datum, Augment]#Marginal]
@@ -107,7 +107,7 @@ object EPInference extends SafeLogging {
       newAugment -> contributionToLikelihood
     }
     val ep = new ExpectationPropagation(project _, convergenceThreshold)
-    val inferencesToUse = (0 until inferences.length).filter(inferences(_) ne null)
+    val inferencesToUse = inferences.indices.filter(inferences(_) ne null)
 
     var state: ep.State = null
     val iterates = ep.inference(augment, inferencesToUse, inferencesToUse.map(i => inferences(i).baseAugment(datum)))

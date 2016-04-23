@@ -26,7 +26,7 @@ class IdentityWordFeaturizer[W](wordCounts: Counter[W, Double], unknownWordThres
         }
       }
 
-      private val _minimalFeatures: immutable.IndexedSeq[Array[Feature]] = (0 until words.length) map { i =>
+      private val _minimalFeatures: immutable.IndexedSeq[Array[Feature]] = words.indices.map { i =>
         val index = indices(i)
         if(index >= 0) {
           IdentityWordFeaturizer.this.minimalFeatures(index)

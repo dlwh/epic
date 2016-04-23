@@ -22,7 +22,7 @@ import epic.trees.TreeInstance
 class ModelObjective[Datum](val model: Model[Datum],
                             batchSelector: IndexedSeq[Int]=>GenTraversable[Datum],
                             val fullRange: IndexedSeq[Int]) extends BatchDiffFunction[DenseVector[Double]] with SafeLogging {
-  def this(model: Model[Datum], data: IndexedSeq[Datum], numThreads: Int = -1) = this(model,ModelObjective.makePar(data, numThreads)(_), 0 until data.length)
+  def this(model: Model[Datum], data: IndexedSeq[Datum], numThreads: Int = -1) = this(model,ModelObjective.makePar(data, numThreads)(_), data.indices)
 
   import model.{ExpectedCounts => _, _}
 

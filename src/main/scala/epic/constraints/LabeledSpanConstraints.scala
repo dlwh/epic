@@ -123,18 +123,14 @@ object LabeledSpanConstraints {
           val length: Int = maxLengthsForPosition.length
           out.writeInt(length)
           if(length < Byte.MaxValue) {
-            for(i <- 0 until length) {
-              out.writeByte( (maxLengthsForPosition(i) min length).toByte)
-            }
+            maxLengthsForPosition.foreach(maxLengthForPosition =>
+              out.writeByte((maxLengthForPosition min length).toByte)
+            )
           } else {
-            for(i <- 0 until length) {
-              out.writeInt(maxLengthsForPosition(i))
-            }
+            maxLengthsForPosition.foreach(out.writeInt)
           }
           out.writeInt(maxLengthsForLabel.length)
-          for(i <- 0 until maxLengthsForLabel.length) {
-            out.writeInt(maxLengthsForLabel(i))
-          }
+          maxLengthsForLabel.foreach(out.writeInt)
           for(i <- 0 until length; j <- (i+1) to length if value.isAllowedSpan(i, j)) {
             val cardinality: Int = spans(i, j).cardinality
             if(cardinality != 0) {
@@ -266,7 +262,7 @@ object LabeledSpanConstraints {
     val maxLengthPos = Array.fill(localization.length)(1)
     val maxLengthLabel = maxLengthForLabel.clone()
 
-    var acceptableTags = BitSet.empty ++ (0 until maxLengthForLabel.length)
+    var acceptableTags = BitSet.empty ++ maxLengthForLabel.indices
     for(length <- 2 to maxMaxLength if acceptableTags.nonEmpty) {
       acceptableTags = acceptableTags.filter(i => maxLengthForLabel(i) >= length)
       if(acceptableTags.nonEmpty)

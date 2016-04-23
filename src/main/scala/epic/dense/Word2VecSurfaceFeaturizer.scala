@@ -169,7 +169,7 @@ class Word2VecDepFeaturizerIndexed[W](val word2VecIndexed: Word2VecIndexed[W],
     new WordVectorDepAnchoringIndexed[W] {
       
       val preterminals = new Array[String](words.size);
-      for (i <- 0 until words.size) {
+      words.indices.foreach { i =>
         preterminals(i) = tagger.tag(words(i));
       }
       

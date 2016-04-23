@@ -27,9 +27,8 @@ object HackyHeadFinderTest {
       if (sentIdx % 1000 == 0) {
         println("Sentence: " + sentIdx);
       }
-      val treeLeaves = tree.leaves.toSeq;
-      for (i <- 0 until treeLeaves.size) {
-        trainWordTagCounts(treeLeaves(i).label, words(i)) += 1.0;
+      (tree.leaves zip words).foreach { case (treeLeaf, word) =>
+        trainWordTagCounts(treeLeaf.label, words) += 1.0
       }
       sentIdx += 1;
     }

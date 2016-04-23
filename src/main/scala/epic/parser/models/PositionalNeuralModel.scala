@@ -111,16 +111,16 @@ class PositionalNeuralModel[L, L2, W](annotator: (BinarizedTree[L], IndexedSeq[W
   override def inferenceFromWeights(weights: DenseVector[Double]): Inference = inferenceFromWeights(weights, true)
   
   def inferenceFromWeights(weights: DenseVector[Double], forTrain: Boolean): Inference = {
-    val layersAndInnerLayers = for (i <- 0 until transforms.size) yield {
+    val layersAndInnerLayers = transforms.indices.map { i =>
       transforms(i).extractLayerAndPenultimateLayer(weights(index.componentOffset(i) until index.componentOffset(i) + index.indices(i).size), forTrain)
     }
     val layers: IndexedSeq[OutputTransform[Array[Int],DenseVector[Double]]#OutputLayer] = layersAndInnerLayers.map(_._1)
     val innerLayers: IndexedSeq[epic.dense.Transform.Layer[Array[Int],DenseVector[Double]]] = layersAndInnerLayers.map(_._2)
-    val depLayers: IndexedSeq[OutputTransform[Array[Int],DenseVector[Double]]#OutputLayer] = for (i <- 0 until depTransforms.size) yield {
+    val depLayers: IndexedSeq[OutputTransform[Array[Int],DenseVector[Double]]#OutputLayer] = depTransforms.indices.map { i =>
       val idxIdx = transforms.size + i
       depTransforms(i).extractLayer(weights(index.componentOffset(idxIdx) until index.componentOffset(idxIdx) + index.indices(idxIdx).size), forTrain)
     }
-    val decoupledLayersAndInner = for (i <- 0 until decoupledTransforms.size) yield {
+    val decoupledLayersAndInner = decoupledTransforms.indices.map { i =>
       val idxIdx = transforms.size + depTransforms.size + i
       decoupledTransforms(i).extractLayerAndPenultimateLayer(weights(index.componentOffset(idxIdx) until index.componentOffset(idxIdx) + index.indices(idxIdx).size), forTrain)
     }
@@ -266,7 +266,7 @@ object PositionalNeuralModel {
         val (begin, split, end) = untetra(key)
         val ffeats = if (end > length) sspec.featuresForSpan(begin, split) else sspec.featuresForSplit(begin, split, end)
         var layerSizeTally = 0
-        for (j <- 0 until layers.size) {
+        layers.indices.foreach { j =>
           layers(j).tallyDerivative(deriv(layerSizeTally until layerSizeTally + layers(j).index.size), { ruleCountsPerState(key) * scale }, ffeats)
           layerSizeTally += layers(j).index.size;
         }
@@ -338,7 +338,7 @@ object PositionalNeuralModel {
         var total = 0.0;
         val tetraIdx = tetra(begin, split, end)
         val rfeats = lspec.featuresForBinaryRule(begin, split, end, rule, ref)
-        for (layerIdx <- 0 until layers.size) {
+        layers.indices.foreach { layerIdx =>
           val fs = getOrElseUpdate(layerIdx, tetraIdx, { penultimateLayers(layerIdx).activations(sspec.featuresForSplit(begin, split, end)) })
           for (rfeat <- rfeats) {
             total += getOrElseUpdateFinal(layerIdx, tetraIdx, rfeat, labelFeaturizer.index.size, { layers(layerIdx).activationsFromPenultimateDot(fs, rfeat) })
@@ -361,7 +361,7 @@ object PositionalNeuralModel {
         var total = 0.0;
         val tetraIdx = tetra(begin, end, length + 1)
         val rfeats = lspec.featuresForUnaryRule(begin, end, rule, ref)
-        for (layerIdx <- 0 until layers.size) {
+        layers.indices.foreach { layerIdx =>
           val fs = getOrElseUpdate(layerIdx, tetraIdx, { penultimateLayers(layerIdx).activations(sspec.featuresForSpan(begin, end)) })
           for (rfeat <- rfeats) {
             total += getOrElseUpdateFinal(layerIdx, tetraIdx, rfeat, labelFeaturizer.index.size, { layers(layerIdx).activationsFromPenultimateDot(fs, rfeat) })
@@ -384,7 +384,7 @@ object PositionalNeuralModel {
         var total = 0.0;
         val tetraIdx = tetra(begin, end, length + 2)
         val rfeats = lspec.featuresForSpan(begin, end, tag, ref)
-        for (layerIdx <- 0 until layers.size) {
+        layers.indices.foreach { layerIdx =>
           val fs = getOrElseUpdate(layerIdx, tetraIdx, { penultimateLayers(layerIdx).activations(sspec.featuresForSpan(begin, end)) })
           for (rfeat <- rfeats) {
             total += getOrElseUpdateFinal(layerIdx, tetraIdx, rfeat, labelFeaturizer.index.size, { layers(layerIdx).activationsFromPenultimateDot(fs, rfeat) })

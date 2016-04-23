@@ -28,7 +28,7 @@ class MinimalWordFeaturizer(wordCounts: Counter[String, Double], includeWordShap
         }
       }
 
-      private val _minimalFeatures: immutable.IndexedSeq[Array[Feature]] = (0 until words.length) map { i =>
+      private val _minimalFeatures: immutable.IndexedSeq[Array[Feature]] = words.indices.map { i =>
         val index = indices(i)
         if(index >= 0) {
           MinimalWordFeaturizer.this.minimalFeatures(index)

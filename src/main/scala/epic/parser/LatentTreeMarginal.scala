@@ -49,7 +49,7 @@ case class LatentTreeMarginal[L, W](anchoring: GrammarAnchoring[L, W],
 
     stree.postorder foreach {
       case t@NullaryTree(Beliefs(labels, iScores, iScale, oScores, oScale), span) =>
-        for( i <- 0 until labels.length) {
+        for( i <- labels.indices) {
           val (l, ref) = labels(i)
           val iS = iScores(i)
           val oS = oScores(i)
@@ -113,7 +113,7 @@ case class LatentTreeMarginal[L, W](anchoring: GrammarAnchoring[L, W],
         assert(t.span.length == 1)
         var foundOne = false
         for {
-           i <- 0 until scores.length
+           i <- scores.indices
            (label, ref) = labels(i)
            wScore =  anchoring.scoreSpan(t.span.begin, t.span.end, label, ref)
            if !wScore.isInfinite
@@ -227,10 +227,10 @@ case class LatentTreeMarginal[L, W](anchoring: GrammarAnchoring[L, W],
       case t @ BinaryTree(parent, lchild, rchild, span) =>
         for {
           ((a, aRef), aScore) <- t.label.labels zip t.label.outside
-          bi <- 0 until lchild.label.labels.length
+          bi <- lchild.label.labels.indices
           (b, bRef) = lchild.label.labels(bi)
           bScore = lchild.label.inside(bi)
-          ci <- 0 until rchild.label.labels.length
+          ci <- rchild.label.labels.indices
           (c, cRef) = rchild.label.labels(ci)
           cScore = rchild.label.inside(ci)
         } {

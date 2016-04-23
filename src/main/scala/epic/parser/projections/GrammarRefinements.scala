@@ -140,7 +140,7 @@ final case class GrammarRefinements[C, F](labels: ProjectionIndexer[C, F], rules
   private val coarseRulesGivenParentRefinement = Array.tabulate(labels.coarseIndex.size) { p =>
   // refinement -> rules
     val result = Array.fill(labels.refinementsOf(p).length)(ArrayBuffer[Int]())
-    for( (rule, r) <- rules.coarseIndex.pairs if labels.coarseIndex(rule.parent) == p && rule.isInstanceOf[BinaryRule[_]]; ref <- 0 until result.length) {
+    for( (rule, r) <- rules.coarseIndex.pairs if labels.coarseIndex(rule.parent) == p && rule.isInstanceOf[BinaryRule[_]]; ref <- result.indices) {
       if(parentCompatibleRefinements(r)(ref).nonEmpty) {
         result(ref) += r
       }

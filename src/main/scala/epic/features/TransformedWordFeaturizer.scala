@@ -38,7 +38,7 @@ class TransformedWordFeaturizer[W](initCounts: Counter[W, Double],
         }
       }
 
-      private val _minimalFeatures: immutable.IndexedSeq[Array[Feature]] = (0 until words.length) map { i =>
+      private val _minimalFeatures: immutable.IndexedSeq[Array[Feature]] = words.indices.map { i =>
         val index = indices(i)
         if(index >= 0) {
           minimalFeatures(index)

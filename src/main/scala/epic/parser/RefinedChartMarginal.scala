@@ -70,7 +70,7 @@ final case class RefinedChartMarginal[L, W](anchoring: GrammarAnchoring[L, W],
     val lexLoc = anchoring.tagConstraints
 
     // handle lexical
-    for (i <- 0 until words.length) {
+    for (i <- words.indices) {
       var visitedSomething  = false
       for {
         a <- lexLoc.allowedTags(i) if  anchoring.sparsityPattern.bot.isAllowedLabeledSpan(i, i+1, a)
@@ -300,7 +300,7 @@ object RefinedChartMarginal {
     val tagConstraints = anchoring.tagConstraints
 
     // handle lexical
-    for{i <- 0 until anchoring.words.length} {
+    for{i <- anchoring.words.indices} {
       assert(anchoring.sparsityPattern.isAllowedSpan(i,i+1), "a pos tag isn't allowed? " + anchoring.sparsityPattern)
       assert(anchoring.sparsityPattern.bot.isAllowedSpan(i,i+1), "a top of a length 1 span isn't allowed?")
       var foundSomething = false

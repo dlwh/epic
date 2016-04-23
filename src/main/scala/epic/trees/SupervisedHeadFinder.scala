@@ -55,7 +55,7 @@ case class HeadDB[B](symbolArityHeadChildCounts: Counter2[(B,Int),Int,Int],
     // Manual arg-max because I suck at using Counter2
     var best = -1;
     var bestCount = 0;
-    for (i <- 0 until children.size) {
+    children.indices.foreach { i =>
       if (ruleHeadChildCounts((l,children),i) > bestCount) {
         best = i;
         bestCount = ruleHeadChildCounts((l,children),i);
@@ -63,7 +63,7 @@ case class HeadDB[B](symbolArityHeadChildCounts: Counter2[(B,Int),Int,Int],
     }
     if (best == -1) {
       // Else, the rule has never been seen before, so try just the symbol+arity
-      for (i <- 0 until children.size) {
+      children.indices.foreach { i =>
         if (symbolArityHeadChildCounts((l,children.size),i) > bestCount) {
           best = i;
           bestCount = ruleHeadChildCounts((l,children),i);
@@ -117,9 +117,7 @@ object SupervisedHeadFinder {
     }
     
     var numMatched = 0;
-    for (i <- 0 until conllTrees.size) {
-      val conllTree = conllTrees(i);
-      val constTree = processedTrees(i);
+    (conllTrees zip processedTrees).foreach { case (conllTree, constTree) =>
       if (conllTree.size == constTree.span.length) {
         rec(constTree, conllTree);
         numMatched += 1;

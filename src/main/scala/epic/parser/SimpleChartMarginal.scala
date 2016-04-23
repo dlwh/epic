@@ -37,7 +37,7 @@ final case class SimpleChartMarginal[L, L2, W](anchoring: SimpleGrammar.Anchorin
 
     val lexLoc = anchoring.lexicon.anchor(anchoring.words)
     // handle lexical
-    for (i <- 0 until words.length) {
+    for (i <- words.indices) {
       var visitedSomething  = false
       for {
         a <- lexLoc.allowedTags(i)

@@ -23,7 +23,7 @@ object IndexedWordFeaturizer {
     val wordIndex = if(deduplicateFeatures) new NonRedundantIndexBuilder[Feature] else new NormalIndexBuilder[Feature]()
     for(words <- data) {
       val anch = feat.anchor(words)
-      for(i <- 0 until words.length) {
+      words.indices.foreach { i =>
         wordIndex.add(anch.featuresForWord(i) )
       }
     }

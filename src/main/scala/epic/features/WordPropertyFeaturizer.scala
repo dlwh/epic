@@ -42,7 +42,7 @@ class WordPropertyFeaturizer(wordCounts: Counter[String, Double],
   def anchor(w: IndexedSeq[String]): WordFeatureAnchoring[String] = new WordFeatureAnchoring[String] {
     def words: IndexedSeq[String] = w
     val indices = words.map(wordIndex)
-    val myFeatures = (0 until words.length).map(i => if (indices(i) < 0) featuresFor(words(i)).toArray else knownWordFeatures(indices(i)))
+    val myFeatures = words.indices.map(i => if (indices(i) < 0) featuresFor(words(i)).toArray else knownWordFeatures(indices(i)))
     def featuresForWord(pos: Int): Array[Feature] = {
       if(pos < 0) Array(BeginSentFeature)
       else if(pos >= words.length) Array(EndSentFeature)

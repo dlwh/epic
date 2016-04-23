@@ -115,7 +115,7 @@ class ParserChartConstraintsFactory[L, W](val parser: Parser[L, W],
       val thresholdedTags = if (arr eq null) {
         BitSet.empty
       } else {
-        BitSet.empty ++ (0 until arr.length filter { s =>
+        BitSet.empty ++ (arr.indices filter { s =>
           arr(s) >= threshold
         })
       }

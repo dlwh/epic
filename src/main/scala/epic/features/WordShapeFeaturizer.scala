@@ -26,7 +26,7 @@ class WordShapeFeaturizer(wordCounts: Counter[String, Double],
         }
       }
 
-      private val _minimalFeatures: IndexedSeq[Array[Feature]] = (0 until words.length) map { i =>
+      private val _minimalFeatures: IndexedSeq[Array[Feature]] = words.indices.map { i =>
         val index = indices(i)
         if(index >= 0) {
           WordShapeFeaturizer.this.minimalFeatures(index)

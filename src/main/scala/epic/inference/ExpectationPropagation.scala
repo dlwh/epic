@@ -24,7 +24,7 @@ class ExpectationPropagation[F,Q <: AnyRef](project: (Q,F)=>(Q,Double), criterio
       var consumed = true
 
       def hasNext = !consumed || {
-        val next =  (0 until f.length).iterator.foldLeft(cur) { (state,i) =>
+        val next =  f.indices.iterator.foldLeft(cur) { (state,i) =>
           val State(f_~, q, _, partitions) = state
           val fi = f(i)
           val fi_~ = f_~(i)

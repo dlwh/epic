@@ -142,7 +142,7 @@ class NextActualWordFeaturizer(f: WordFeaturizer[String], lookRight: Boolean, is
     new WordFeatureAnchoring[String] {
       val base = f.anchor(w)
       // one for each position
-      val features: immutable.IndexedSeq[Array[Feature]] = (0 until w.length).map { _pos =>
+      val features: immutable.IndexedSeq[Array[Feature]] = w.indices.map { _pos =>
 
         var pos = _pos
         val delta = if(lookRight) 1 else -1

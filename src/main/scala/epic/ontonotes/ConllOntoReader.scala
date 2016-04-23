@@ -45,7 +45,7 @@ object ConllOntoReader {
       val stringTree =  {
         val parseBits = s.map(_(5))
         val b = new StringBuilder()
-        for(i <- 0 until parseBits.length) {
+        parseBits.indices.foreach { i =>
           b ++= parseBits(i).replace("*","( "+ tags(i) + " " + words(i) + " )")
         }
         Tree.fromString(b.toString)._1
@@ -54,7 +54,7 @@ object ConllOntoReader {
       val entities = collection.mutable.Map[(Int,Int), NerType.Value]()
       var currentChunkStart = -1
       var currentChunkType = NerType.OutsideSentence
-      for(i <- 0 until s.length) {
+      s.indices.foreach { i =>
         val chunk = s(i)(10)
         if(chunk.startsWith("(")) {
           assert(currentChunkStart < 0)
@@ -76,7 +76,7 @@ object ConllOntoReader {
         val lastValue = collection.mutable.Stack[(String, Int)]()
         val arguments = ArrayBuffer[Argument]()
         var verb = -1
-        for (i <- 0 until s.length) {
+        s.indices.foreach { i =>
           if (s(i)(column).startsWith("(")) {
             val trimmed = s(i)(column).substring(1, s(i)(column).lastIndexOf("*"))
             for(name <- trimmed.split("[(]"))
@@ -109,7 +109,7 @@ object ConllOntoReader {
       val stack = new collection.mutable.HashMap[Int, Stack[Int]]() {
         override def default(key: Int) = getOrElseUpdate(key,new Stack())
       }
-      for(i <- 0 until s.length) {
+      s.indices.foreach { i =>
         val chunk = s(i).last
         if(chunk != "-")
           for( id <- chunk.split("\\|")) {

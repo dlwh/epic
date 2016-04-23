@@ -66,7 +66,7 @@ case class CachingLookupAndAffineTransformDense[FV](numOutputs: Int,
 
     def activations(fv: Array[Int]) = {
       val finalVector = DenseVector.zeros[Double](numOutputs)
-      for (i <- 0 until fv.size) {
+      fv.indices.foreach { i =>
 //        val wordPosn = fv(i) -> i
         if (fv(i) != -1) {
           caches(i).synchronized {
