@@ -171,7 +171,6 @@ class ParserChartConstraintsFactory[L, W](val parser: Parser[L, W],
               nGoldConstructed += 1
             else {
               throw new RuntimeException("Can't construct gold tree for " + " " + marg.words)
-              counts(c) += 1
             }
             gThresholds += arr(c)
           }
