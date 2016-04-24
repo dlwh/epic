@@ -125,7 +125,7 @@ object MascFile {
   lazy val outsideNe = MAnnotation("outside", "outside", "none", Map[String,String]())
 
   def apply(targets: Seq[(File, String)]): Iterator[MascFile] = {
-    targets.toIterator.flatMap { case(file, prefix) => {
+    targets.toIterator.flatMap { case(file, prefix) =>
       try {
         val mfile = MascFile(file,prefix)
         System.err.println("Success: " + file + "," + prefix)
@@ -135,7 +135,7 @@ object MascFile {
         System.err.println("Failure: " + file + "," + prefix)
         None
       }
-    }}
+    }
   }
 
   def apply(dir: File, prefix: String): MascFile = {
