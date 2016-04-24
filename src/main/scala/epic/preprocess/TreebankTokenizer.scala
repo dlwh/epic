@@ -29,7 +29,6 @@ class TreebankTokenizer() extends Tokenizer with Serializable {
     })
   }
 
-
 }
 
 object TreebankTokenizer extends TreebankTokenizer {
@@ -71,7 +70,6 @@ object TreebankTokenizer extends TreebankTokenizer {
       slabWithTokens.iterator[Sentence].map{sent =>
         val gold = slabWithTokens.covered[Segment](sent._1).map { case (span, tok) => slab.spanned(span)}
         val guess = TreebankTokenizer(slab.spanned(sent._1))
-
         (gold, guess, slab.spanned(sent._1))
       }
     }

@@ -21,7 +21,7 @@ final class SparseRuleTensor[L] private(val leftChildOffsets: Array[Int],
                                val unaryParentIndicesAndScores: Array[Int],
                                outside: Boolean) extends Serializable {
 
-  val numLeftChildren = leftChildOffsets.size - 1
+  val numLeftChildren = leftChildOffsets.length - 1
 
   def leftChildRange(lc: Int):Span = Span(leftChildOffsets(lc), leftChildOffsets(lc+1) )
 
@@ -36,7 +36,6 @@ final class SparseRuleTensor[L] private(val leftChildOffsets: Array[Int],
     val second = parentIndicesAndScores(off * 3 + 2)
     java.lang.Double.longBitsToDouble((first.toLong << 32) | (second.toLong&0xFFFFFFFFL))
   }
-
 
   def unaryChildRange(lc: Int):Span = Span(unaryChildPtrs(lc), unaryChildPtrs(lc+1) )
 
@@ -57,7 +56,7 @@ final class SparseRuleTensor[L] private(val leftChildOffsets: Array[Int],
       p = parentForOffset(pOff)
       score = ruleScoreForOffset(pOff)
     } yield {
-      if(outside)
+      if (outside)
         BinaryRule(lc, rc, p) -> score
       else
         BinaryRule(p, lc, rc) -> score
@@ -79,26 +78,25 @@ object SparseRuleTensor {
     var lastRcOffset = 0
     var lastOffset = 0
 
-//    leftChildOffsets += 0
+    // leftChildOffsets += 0
 
     for(r <- orderedRuleIndices) {
       val lc = leftChild(r)
       var endRightChild = false
       assert(lastLc <= lc)
-      while(lastLc != lc) {
+      while (lastLc != lc) {
         lastLc += 1
         leftChildOffsets += lastRcOffset
         endRightChild = true
       }
 
       val rc = rightChild(r)
-      if(endRightChild || rc != lastRc) {
+      if (endRightChild || rc != lastRc) {
         rightChildIndicesAndOffsets += rc
         rightChildIndicesAndOffsets += lastOffset
         lastRc = rc
         lastRcOffset += 1
       }
-
 
       val p = parent(r)
       val rs = grammar.ruleScore(r)
@@ -123,7 +121,7 @@ object SparseRuleTensor {
     for(r <- unaryRules) {
       val lc = child(r)
       assert(lastLc <= lc)
-      while(lastLc != lc) {
+      while (lastLc != lc) {
         unaryChildOffsets += lastOffset
         lastLc += 1
       }
@@ -136,7 +134,7 @@ object SparseRuleTensor {
       unaryParentIndicesAndScores += (p, encodedFirst, encodedSecond)
       lastOffset += 1
     }
-    while(lastLc <= grammar.refinedTopology.labelIndex.size) {
+    while (lastLc <= grammar.refinedTopology.labelIndex.size) {
       lastLc += 1
       unaryChildOffsets += lastOffset
     }
@@ -161,26 +159,25 @@ object SparseRuleTensor {
     var lastRcOffset = 0
     var lastOffset = 0
 
-//    leftChildOffsets += 0
+    // leftChildOffsets += 0
 
     for(r <- orderedRuleIndices) {
       val lc = parent(r)
       var endRightChild = false
       assert(lastLc <= lc)
-      while(lastLc != lc) {
+      while (lastLc != lc) {
         lastLc += 1
         leftChildOffsets += lastRcOffset
         endRightChild = true
       }
 
       val rc = leftChild(r)
-      if(endRightChild || rc != lastRc) {
+      if (endRightChild || rc != lastRc) {
         rightChildIndicesAndOffsets += rc
         rightChildIndicesAndOffsets += lastOffset
         lastRc = rc
         lastRcOffset += 1
       }
-
 
       val p = rightChild(r)
       val rs = grammar.ruleScore(r)
@@ -204,7 +201,7 @@ object SparseRuleTensor {
     lastOffset = 0
     for(r <- unaryRules) {
       val lc = parent(r)
-      while(lastLc != lc) {
+      while (lastLc != lc) {
         unaryChildOffsets += lastOffset
         lastLc += 1
       }
@@ -217,19 +214,17 @@ object SparseRuleTensor {
       unaryParentIndicesAndScores += (p, encodedFirst, encodedSecond)
       lastOffset += 1
     }
-    while(lastLc <= labelIndex.size) {
+    while (lastLc <= labelIndex.size) {
       lastLc += 1
       unaryChildOffsets += lastOffset
     }
 
     val ret = new SparseRuleTensor[L2](leftChildOffsets.toArray, rightChildIndicesAndOffsets.toArray, parentIndicesAndScores.toArray, unaryChildOffsets.toArray, unaryParentIndicesAndScores.toArray, true)
 
-
     assert(ret.ruleIterator.map(_._1).toIndexedSeq == orderedRuleIndices.map(indexedRules(_)), s"\n${ret.ruleIterator.map(_._1).toIndexedSeq}\n${orderedRuleIndices.map(indexedRules(_))}")
     assert(ret.ruleIterator.map(_._2).toIndexedSeq == orderedRuleIndices.map(grammar.ruleScore(_)))
 
     ret
   }
-
 
 }

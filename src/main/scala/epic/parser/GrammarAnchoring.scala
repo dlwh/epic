@@ -37,7 +37,6 @@ trait GrammarAnchoring[L, W]  {
 
   def logPartition: Double = marginal.logPartition
 
-
   private lazy val lexLoc = lexicon.anchor(words)
 
   def tagConstraints: TagConstraints[L] = lexLoc
@@ -85,8 +84,6 @@ trait GrammarAnchoring[L, W]  {
     else new ProductGrammarAnchoring(this,other)
   }
 
-
-
   /**
    * Computes the pointwise division of two grammars, augmenting
    * their refinement space to reflect this. If they share the same annotationTag,
@@ -104,7 +101,7 @@ trait GrammarAnchoring[L, W]  {
   def maxMarginal = RefinedChartMarginal(this, maxMarginal = true)
   def marginal = RefinedChartMarginal(this, maxMarginal = false)
 
-  def isConvergedTo(f: GrammarAnchoring[L, W], diff: Double):Boolean = {
+  def isConvergedTo(f: GrammarAnchoring[L, W], diff: Double): Boolean = {
     import scala.util.control.Breaks._
     var converged = true
     breakable {
@@ -112,9 +109,6 @@ trait GrammarAnchoring[L, W]  {
         def visitBinaryRule(begin: Int, split: Int, end: Int, rule: Int, ref: Int, score: Double) {
           val myScore = scoreBinaryRule(begin, split, end, rule, ref)
           val theirScore = f.scoreBinaryRule(begin, split, end, rule, ref)
-
-
-
           if (myScore != theirScore)  {
             if (theirScore.isInfinite || myScore.isInfinite) {
                 converged = false
@@ -126,15 +120,12 @@ trait GrammarAnchoring[L, W]  {
               break()
             }
           }
-
         }
 
         def visitUnaryRule(begin: Int, end: Int, rule: Int, ref: Int, score: Double) {
           val myScore = scoreUnaryRule(begin, end, rule, ref)
           val theirScore = f.scoreUnaryRule(begin, end, rule, ref)
           assert(!myScore.isInfinite)
-
-
           if (myScore != theirScore)  {
             if (theirScore.isInfinite || myScore.isInfinite) {
               converged = false
@@ -146,14 +137,11 @@ trait GrammarAnchoring[L, W]  {
               break()
             }
           }
-
         }
 
         def visitSpan(begin: Int, end: Int, tag: Int, ref: Int, score: Double) = {
           val myScore = scoreSpan(begin, end, tag, ref)
           val theirScore = f.scoreSpan(begin, end, tag, ref)
-
-
           if (myScore != theirScore)  {
             if (theirScore.isInfinite || myScore.isInfinite) {
               converged = true
@@ -165,15 +153,13 @@ trait GrammarAnchoring[L, W]  {
               break()
             }
           }
-
         }
 
       }
     }
-//    println(converged)
+    // println(converged)
     converged
   }
-
 
   /**
    * The annotationTag controls if two grammars are over the same refinements.
@@ -200,11 +186,9 @@ trait GrammarAnchoring[L, W]  {
 
   def maxLabelRefinements: Int = (0 until topology.labelIndex.size).map(numValidRefinements _).max
 
-  def numValidRefinements(label: Int):Int
+  def numValidRefinements(label: Int): Int
 
-  def numValidRuleRefinements(rule: Int):Int
-
-
+  def numValidRuleRefinements(rule: Int): Int
 
   /**
    * For a given span and the parent's refinement, what refinements to the rule are allowed?
@@ -221,10 +205,10 @@ trait GrammarAnchoring[L, W]  {
   def validRuleRefinementsGivenRightChild(completionBegin: Int, completionEnd: Int, split: Int, end: Int, rule: Int, childRef: Int):Array[Int]
   def validUnaryRuleRefinementsGivenChild(begin: Int, end: Int, rule: Int, childRef: Int):Array[Int]
 
-  def leftChildRefinement(rule: Int, ruleRef: Int):Int
-  def rightChildRefinement(rule: Int, ruleRef: Int):Int
-  def parentRefinement(rule: Int, ruleRef: Int):Int
-  def childRefinement(rule: Int, ruleRef: Int):Int
+  def leftChildRefinement(rule: Int, ruleRef: Int): Int
+  def rightChildRefinement(rule: Int, ruleRef: Int): Int
+  def parentRefinement(rule: Int, ruleRef: Int): Int
+  def childRefinement(rule: Int, ruleRef: Int): Int
 
   /**
    * Returns the refined rule given parent and child refinements for a unary rule.
@@ -234,7 +218,7 @@ trait GrammarAnchoring[L, W]  {
    * @param refB child index
    * @return rule refinement id, or -1 if rule is not allowed with those refinements
    */
-  def ruleRefinementFromRefinements(r: Int, refA: Int, refB: Int):Int
+  def ruleRefinementFromRefinements(r: Int, refA: Int, refB: Int): Int
 
   /**
    * Returns the refined rule given parent and child refinements for a unary rule.
@@ -245,7 +229,7 @@ trait GrammarAnchoring[L, W]  {
    * @param refC right child index
    * @return rule refinement id, or -1 if rule is not allowed with those refinements
    */
-  def ruleRefinementFromRefinements(r: Int, refA: Int, refB: Int, refC: Int):Int
+  def ruleRefinementFromRefinements(r: Int, refA: Int, refB: Int, refC: Int): Int
 
   def validCoarseRulesGivenParentRefinement(a: Int, refA: Int): Array[Int]
 
@@ -262,8 +246,6 @@ object GrammarAnchoring {
     UnrefinedGrammarAnchoring.identity[L, W](topology, lexicon, words, constraints)
   }
 
-
-
   trait StructureDelegatingAnchoring[L, W] extends GrammarAnchoring[L, W] {
     protected def baseAnchoring: GrammarAnchoring[L, W]
 
@@ -272,11 +254,11 @@ object GrammarAnchoring {
 
     def words: IndexedSeq[W] = baseAnchoring.words
 
-//    def scoreSpan(begin: Int, end: Int, label: Int, ref: Int): Double = baseAnchoring.scoreSpan(begin: Int, end: Int, label: Int, ref: Int)
+    // def scoreSpan(begin: Int, end: Int, label: Int, ref: Int): Double = baseAnchoring.scoreSpan(begin: Int, end: Int, label: Int, ref: Int)
 
-//    def scoreBinaryRule(begin: Int, split: Int, end: Int, rule: Int, ref: Int): Double = baseAnchoring.scoreBinaryRule(begin: Int, split: Int, end: Int, rule: Int, ref: Int)
+    // def scoreBinaryRule(begin: Int, split: Int, end: Int, rule: Int, ref: Int): Double = baseAnchoring.scoreBinaryRule(begin: Int, split: Int, end: Int, rule: Int, ref: Int)
 
-//    def scoreUnaryRule(begin: Int, end: Int, rule: Int, ref: Int): Double = baseAnchoring.scoreUnaryRule(begin: Int, end: Int, rule: Int, ref: Int)
+    // def scoreUnaryRule(begin: Int, end: Int, rule: Int, ref: Int): Double = baseAnchoring.scoreUnaryRule(begin: Int, end: Int, rule: Int, ref: Int)
 
     def validLabelRefinements(begin: Int, end: Int, label: Int): Array[Int] = baseAnchoring.validLabelRefinements(begin: Int, end: Int, label: Int)
 
@@ -299,7 +281,6 @@ object GrammarAnchoring {
     def parentRefinement(rule: Int, ruleRef: Int): Int = baseAnchoring.parentRefinement(rule: Int, ruleRef: Int)
 
     def childRefinement(rule: Int, ruleRef: Int): Int = baseAnchoring.childRefinement(rule: Int, ruleRef: Int)
-
 
     def ruleRefinementFromRefinements(r: Int, refA: Int, refB: Int): Int = baseAnchoring.ruleRefinementFromRefinements(r: Int, refA: Int, refB: Int)
 

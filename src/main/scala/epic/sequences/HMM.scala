@@ -38,7 +38,7 @@ object HMM {
 
         val wcs = w.map(wordCounts(_))
         val validSyms = w.map { w =>
-          if(wordCounts(w) >= 10) {
+          if (wordCounts(w) >= 10) {
             emissions(::, w).findAll( _ > 0).map(labelIndex(_)).toSet
           } else {
             allSyms
@@ -57,12 +57,12 @@ object HMM {
           emitScore + encodedTransitions(prev, cur)
         }
 
-        def scoreEmission(cur: Int, pos: Int): Double = if(smoothEmissions) {
+        def scoreEmission(cur: Int, pos: Int): Double = if (smoothEmissions) {
           val w = words(pos)
           var cWord = wcs(pos)
           var cTagWord = emissions(labelIndex.get(cur), w)
           assert(cWord >= cTagWord)
-          if(cWord < 10) {
+          if (cWord < 10) {
             cWord += 1.0
             cTagWord += indexedLabelCounts(cur) / wordCounts.size
           }

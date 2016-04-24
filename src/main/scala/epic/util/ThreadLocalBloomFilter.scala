@@ -20,7 +20,6 @@ class ThreadLocalBloomFilter[@specialized(Int, Long) T](numBuckets: Int, numHash
     }
   }
 
-
   override def addOrSeen(x: T): Boolean = {tl.get() += x; true}
 
   private val queue = new ConcurrentLinkedDeque[BloomFilter[T]]()
@@ -29,7 +28,7 @@ class ThreadLocalBloomFilter[@specialized(Int, Long) T](numBuckets: Int, numHash
     val bf = tl.get()
     var i = 0
     val len = queue.size
-    while(!queue.isEmpty && i < len) {
+    while (!queue.isEmpty && i < len) {
       bf |= queue.pop()
       i += 1
     }
@@ -41,7 +40,6 @@ class ThreadLocalBloomFilter[@specialized(Int, Long) T](numBuckets: Int, numHash
     val u = union
     val load = u.load
     val size = - u.numBuckets * math.log1p(-load)/u.numHashFunctions
-
     logger.info(f"Bloom filter has load of ${u.load}%.3f and approx size $size. Queue is ${queue.size()} elements long.")
     new BloomFilterSeenSet[T](u)
   }

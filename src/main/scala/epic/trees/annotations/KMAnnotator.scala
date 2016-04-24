@@ -21,7 +21,8 @@ package annotations
  */
 
 case class KMAnnotator( horizontal: Int = 2, vertical: Int = 2) extends TreeAnnotator[AnnotatedLabel, String, AnnotatedLabel] {
-  val pipeline = (
+
+  val pipeline =
     FilterAnnotations[String](Set(FunctionalTag("TMP"))) andThen
     Markovize[String](horizontal,vertical) andThen
     SplitAuxiliary() andThen
@@ -33,10 +34,7 @@ case class KMAnnotator( horizontal: Int = 2, vertical: Int = 2) extends TreeAnno
     MarkNonIdentityUnaries[String]() andThen
     MarkExternalUnaries[String]()  andThen
     DominatesV[String]()
-    )
-
 
   def apply(tree: BinarizedTree[AnnotatedLabel], words: Seq[String]) = pipeline(tree, words)
-
 
 }

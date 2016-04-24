@@ -63,12 +63,11 @@ object BilexicalFeaturizer {
     }
   }
 
-
   case class AdaptedSurfaceFeaturizer[W](base: SurfaceFeaturizer[W]) extends BilexicalFeaturizer[W] {
     def anchor(w: IndexedSeq[W]): BilexicalFeatureAnchoring[W] = new BilexicalFeatureAnchoring[W] {
       val ba = base.anchor(w)
       def featuresForAttachment(head: Int, dep: Int): Array[Feature] = {
-        if(head < dep) ba.featuresForSpan(head, dep)
+        if (head < dep) ba.featuresForSpan(head, dep)
         else ba.featuresForSpan(dep, head)
       }
     }
@@ -91,7 +90,7 @@ object BilexicalFeaturizer {
   case class BinomialFeaturizer[W](headBase: BilexicalFeaturizer[W], depBase: BilexicalFeaturizer[W]) extends BilexicalFeaturizer[W] {
     def anchor(w: IndexedSeq[W]): BilexicalFeatureAnchoring[W] = new BilexicalFeatureAnchoring[W] {
       val hb = headBase.anchor(w)
-      val db = if(headBase eq depBase) hb else depBase.anchor(w)
+      val db = if (headBase eq depBase) hb else depBase.anchor(w)
       def featuresForAttachment(head: Int, dep: Int): Array[Feature] = {
         val hf = hb.featuresForAttachment(head, dep)
         val df = db.featuresForAttachment(head, dep)
@@ -104,7 +103,7 @@ object BilexicalFeaturizer {
   case class HeadDepFeaturizer[W](headBase: WordFeaturizer[W], depBase: WordFeaturizer[W]) extends BilexicalFeaturizer[W] {
     def anchor(w: IndexedSeq[W]): BilexicalFeatureAnchoring[W] = new BilexicalFeatureAnchoring[W] {
       val hb = headBase.anchor(w)
-      val db = if(headBase eq depBase) hb else depBase.anchor(w)
+      val db = if (headBase eq depBase) hb else depBase.anchor(w)
       def featuresForAttachment(head: Int, dep: Int): Array[Feature] = {
         Arrays.crossProduct(hb.featuresForWord(head), db.featuresForWord(dep))((a, b) => HeadDepFeature(a,b):Feature)
       }
@@ -133,7 +132,6 @@ trait BilexicalFeatureAnchoring[W] {
   def featuresForAttachment(head: Int, dep: Int):Array[Feature]
 }
 
-
 @SerialVersionUID(1L)
 class ProductIndexedBilexicalFeaturizer[W](headFeaturizer: IndexedWordFeaturizer[W],
                                     depFeaturizer: IndexedWordFeaturizer[W],
@@ -153,7 +151,6 @@ class ProductIndexedBilexicalFeaturizer[W](headFeaturizer: IndexedWordFeaturizer
         ret = f1
         cache(head)(dep) = f1
       }
-
       ret
     }
   }
@@ -208,8 +205,8 @@ object IndexedBilexicalFeaturizer {
       for( (head, dep) <- tree.arcs if head < tree.words.length) {
         builder.add(hanch.featuresForWord(head),
           danch.featuresForWord(dep))
- //       builder.add(danch.featuresForWord(head),
- //         hanch.featuresForWord(dep))
+  //      builder.add(danch.featuresForWord(head),
+  //      hanch.featuresForWord(dep))
       }
     }
 

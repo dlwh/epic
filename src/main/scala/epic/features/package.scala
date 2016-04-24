@@ -14,7 +14,6 @@ package object features {
     for(x <- it) {
       builder.add(gen(x))
     }
-
     builder.result()
   }
 

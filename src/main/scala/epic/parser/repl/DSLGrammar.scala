@@ -38,8 +38,6 @@ object DSLGrammar {
       case DSLLex(a, word, w) =>
         lexicon(a, word) = w
     }
-
-
     val grammar = RuleTopology("S", binaryProductions, unaryProductions)
     val unsmoothed = new UnsmoothedLexicon(grammar.labelIndex, lexicon.keySet.toSet)
     Grammar.generative(grammar, unsmoothed, binaryProductions, unaryProductions, lexicon)

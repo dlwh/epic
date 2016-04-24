@@ -19,7 +19,6 @@ import epic.parser._
 import breeze.linalg._
 import breeze.numerics._
 
-
 case class KBestListMarginal[L, W](anchoring: GrammarAnchoring[L, W],
                                    marginals: IndexedSeq[ParseMarginal[L, W]]) extends ParseMarginal[L, W] {
 
@@ -41,12 +40,10 @@ case class KBestListMarginal[L, W](anchoring: GrammarAnchoring[L, W],
       m.visitPostorder(new AnchoredVisitor[L] {
         def visitUnaryRule(begin: Int, end: Int, rule: Int, ref: Int, score: Double) {
           spanVisitor.visitUnaryRule(begin, end, rule, ref, score * probsPerTree(i))
-
         }
 
         def visitSpan(begin: Int, end: Int, tag: Int, ref: Int, score: Double) {
           spanVisitor.visitSpan(begin, end, tag, ref, score * probsPerTree(i))
-
         }
 
         def visitBinaryRule(begin: Int, split: Int, end: Int, rule: Int, ref: Int, score: Double) {
@@ -55,8 +52,6 @@ case class KBestListMarginal[L, W](anchoring: GrammarAnchoring[L, W],
       }, spanThreshold - math.log(probsPerTree(i)))
     }
   }
-
-
 
   override def insideBotScore(begin: Int, end: Int, sym: Int, ref: Int): Double = ???
 

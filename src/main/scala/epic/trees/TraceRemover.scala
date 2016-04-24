@@ -10,19 +10,17 @@ class TraceRemover[T, W](emptyCategory: T=>Boolean) extends (Tree[T] =>Tree[T]) 
     def rec(tree: Tree[T]):Option[Tree[T]] = {
       if (emptyCategory(tree.label) || tree.span.begin == tree.span.end) {
         None
-      } else if (tree.children.length == 0) {
+      } else if (tree.children.isEmpty) {
         Some(tree)
       } else {
         val newChildren = tree.children.map(rec).collect{ case Some(t) => t }
-        if (newChildren.length == 0 && !tree.isLeaf) {
+        if (newChildren.isEmpty && !tree.isLeaf) {
           None
         } else {
           Some(Tree(tree.label,newChildren, tree.span))
         }
       }
     }
-
     rec(tree).get
   }
-
 }

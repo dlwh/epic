@@ -10,7 +10,7 @@ case class HashFeature(hashBucket: Int) extends Feature
 
 object HashFeature {
   sealed trait Scale {
-    def numFeatures(nonHashFeatures: Int):Int
+    def numFeatures(nonHashFeatures: Int): Int
   }
 
   case class Absolute(numHashFeatures: Int) extends Scale {

@@ -25,17 +25,11 @@ import epic.trees.{AnnotatedLabel, Tree}
  */
 case class Document(id: String, sentences: IndexedSeq[Sentence]) extends Example[IndexedSeq[OntoAnnotations], IndexedSeq[IndexedSeq[String]]] {
   def dspans = sentences.flatMap(_.dspans)
-
   def words: IndexedSeq[IndexedSeq[String]] = sentences.map(_.words)
-
   def features = words
-
   lazy val label: IndexedSeq[OntoAnnotations] = sentences.map(_.label)
-
   lazy val trees: IndexedSeq[Tree[AnnotatedLabel]] = sentences.map(_.tree)
-
   lazy val ner: Map[DSpan, NerType.Value] = sentences.map(_.ner).reduceLeft(_ ++ _)
-
   lazy val coref: Map[DSpan, Mention] = sentences.map(_.coref).reduceLeft(_ ++ _)
 }
 

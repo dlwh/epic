@@ -73,14 +73,11 @@ object TextExtractor {
     val textHandler = new ToTextContentHandler() {
       override def ignorableWhitespace(ch: Array[Char], start: Int, length: Int): Unit = characters(ch, start, length)
 
-
       override def startElement(uri: String, localName: String, qName: String, attributes: Attributes): Unit = {
         super.startElement(uri, localName, qName, attributes)
-
         if (newLineTags(qName.toLowerCase)) {
           ignorableWhitespace(Array('\n'), 0, 1)
         }
-
       }
 
       override def endElement(uri: String, localName: String, qName: String): Unit = {
@@ -91,7 +88,7 @@ object TextExtractor {
 
       }
     }
-    val handler = if(extractMainContentOnly) {
+    val handler = if (extractMainContentOnly) {
       new BoilerpipeContentHandler(textHandler, ArticleExtractor.getInstance()) {
         // stupid handler doesn't pass whitespace
         /*
@@ -103,9 +100,6 @@ object TextExtractor {
           }
         }
         */
-
-
-
         setIncludeMarkup(true)
       }
     } else {
@@ -125,13 +119,10 @@ object TextExtractor {
       stream.close()
     }
 
-
     val content = textHandler.toString.trim
 
     Slab(content).addLayer(Span(0, content.length) -> epic.slab.Source(url))
   }
-
-
 
   /* TODO: I'd like to be able to keep the XHTML formatting in the text, but right now that looks like it's going to
   cause problems with the way slabs work. (Namely, we'll get discontiguous blocks of text, even in the middle of words.
@@ -168,10 +159,8 @@ object TextExtractor {
           sb.append("\"")
         }
 
-
         sb.append('>')
       }
-
 
       override def endElement(uri: String, localName: String, qName: String): Unit = {
         sb.append("</")
@@ -188,7 +177,7 @@ object TextExtractor {
         val s = sb.length
         val value = new String(ch, start, length)
         sb.append(StringEscapeUtils.escapeXml11(value))
-        if(textElements(index)) {
+        if (textElements(index)) {
           contents.append(Span(s, sb.length) -> Content(getLabelsForTextElement(doc, index)))
         }
       }
@@ -204,7 +193,6 @@ object TextExtractor {
 
   }
 
-
   private def getLabelsForTextElement(doc: TextDocument, index: Int): Set[String] = {
     doc.getTextBlocks.asScala.find(_.getContainedTextElements.get(index)).map(b => Option(b.getLabels).map(_.asScala).iterator.flatten.toSet).getOrElse(Set.empty)
   }
@@ -213,12 +201,9 @@ object TextExtractor {
   def extractXHTML(url: URL) = {
     val metadata = new Metadata()
     val stream: InputStream = TikaInputStream.get(url, metadata)
-
     val loader = new Loader()
     new Tika().getParser.parse(stream, loader, metadata, new ParseContext)
-
     loader.value
-
   }
 
   def foo(url: URL)=  {
@@ -241,7 +226,7 @@ import scala.xml._
     override def endDocument() {
       newAdapter.endDocument()
       // the pdf parser sends two end documents...
-      if(newAdapter.scopeStack.nonEmpty)
+      if (newAdapter.scopeStack.nonEmpty)
         newAdapter.scopeStack.pop()
     }
     override def endElement(uri: String, localName: String, qName: String) {
@@ -261,8 +246,6 @@ import scala.xml._
     override def ignorableWhitespace(ch: Array[Char], start: Int, length: Int): Unit = {
       characters(ch, start, length)
     }
-
-
   }
 
   def hasTika = {

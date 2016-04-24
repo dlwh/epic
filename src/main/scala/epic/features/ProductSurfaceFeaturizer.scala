@@ -19,8 +19,6 @@ class ProductSurfaceFeaturizer[W](f1: SurfaceFeaturizer[W], f2: SurfaceFeaturize
     }
 
     def words: IndexedSeq[W] = w
-
-
   }
 
 }

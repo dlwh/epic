@@ -2,7 +2,6 @@ package epic.util
 
 import epic.framework.{Example, Observation}
 
-
 /**
  *
  * @author dlwh
@@ -15,7 +14,6 @@ trait Has[WhatIHave] {
 trait Has2[Haver, +WhatIHave] {
     def get(h: Haver):WhatIHave
 }
-
 
 object Has2 {
   implicit def identityHas2[H]:Has2[H, H] = new Has2[H, H] with Serializable  {

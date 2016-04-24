@@ -12,7 +12,7 @@ import scala.util.hashing.MurmurHash3
 
 @SerialVersionUID(1743448091752596096L)
 case class CrossProductFeature[A, B](labelPart: A, surfacePart: B, id: String = "") extends Feature {
-  override def toString = s"${if(id.nonEmpty) id else "CrossProduct"}Feature($labelPart, $surfacePart)"
+  override def toString = s"${if (id.nonEmpty) id else "CrossProduct"}Feature($labelPart, $surfacePart)"
 }
 
 /**
@@ -31,7 +31,6 @@ class CrossProductIndex[A, B] private (val firstIndex: Index[A],
                                        seenSet: LockableSeenSet[Long] = LockableSeenSet.always) extends Index[Feature] with Serializable {
   def surfacePart(i: Int) = surfacePartOfFeature(i - labelOnlySize)
   def labelPart(i: Int) = labelPartOfFeature(i - labelOnlySize)
-
 
   def lock = {
     val lockedFirst: Index[A] = firstIndex match {
@@ -58,39 +57,36 @@ class CrossProductIndex[A, B] private (val firstIndex: Index[A],
     case _ => -1
   }
 
-  def mapped(labelFeature: Int, surfaceFeature: Int):Int = {
-    if(labelFeature < 0 || surfaceFeature < 0) {
+  def mapped(labelFeature: Int, surfaceFeature: Int): Int = {
+    if (labelFeature < 0 || surfaceFeature < 0) {
       -1
     } else {
       val arr = mapping(labelFeature)
-      val f = if(arr ne null) {
+      val f = if (arr ne null) {
          arr(surfaceFeature)
       } else {
         -1
       }
-
-      if(f != -1 || numHashFeatures == 0) {
+      if (f != -1 || numHashFeatures == 0) {
         f
       } else if (f < -1) { // really not present
         -1
       } else {
         val hf = MurmurHash3.mixLast(MurmurHash3.mix(10891, labelFeature.##), surfaceFeature.##).abs
-        if(!seenSet.addOrSeen(hf)) {
+        if (!seenSet.addOrSeen(hf)) {
           -1
         } else {
           (hf % numHashFeatures) + trueSize
         }
       }
     }
-
   }
 
-
-  private val labelOnlySize: Int = if(includePlainLabelFeatures) firstIndex.size else 0
+  private val labelOnlySize: Int = if (includePlainLabelFeatures) firstIndex.size else 0
   private val trueSize = labelOnlySize + labelPartOfFeature.length
   override def size: Int = trueSize + numHashFeatures
 
-  def unapply(i: Int): Option[Feature] = if(i >= size || i < 0)  None else Some(get(i))
+  def unapply(i: Int): Option[Feature] = if (i >= size || i < 0)  None else Some(get(i))
 
   override def get(i: Int): Feature = {
     if (i >= size || i < 0) {
@@ -110,15 +106,15 @@ class CrossProductIndex[A, B] private (val firstIndex: Index[A],
 
   def crossProduct(lFeatures: Array[Int], sFeatures: Array[Int], offset: Int = 0, usePlainLabelFeatures: Boolean = true):Array[Int] = {
     val builder = new mutable.ArrayBuilder.ofInt
-    builder.sizeHint(lFeatures.length * (sFeatures.length + {if(includePlainLabelFeatures) 1 else 0}))
+    builder.sizeHint(lFeatures.length * (sFeatures.length + {if (includePlainLabelFeatures) 1 else 0}))
     var i = 0
-    while(i < lFeatures.length) {
-      if(usePlainLabelFeatures && includePlainLabelFeatures && lFeatures(i) >= 0)
+    while (i < lFeatures.length) {
+      if (usePlainLabelFeatures && includePlainLabelFeatures && lFeatures(i) >= 0)
         builder += (lFeatures(i) + offset)
       var j = 0
-      while(j < sFeatures.length) {
+      while (j < sFeatures.length) {
         val m = mapped(lFeatures(i),sFeatures(j)) + offset
-        if(m != -1)
+        if (m != -1)
           builder += m
         j += 1
       }
@@ -133,31 +129,30 @@ class CrossProductIndex[A, B] private (val firstIndex: Index[A],
     val builder = new CSCMatrix.Builder[Double](firstIndex.size, secondIndex.size)
     val vbuilder = new VectorBuilder[Double](firstIndex.size)
 
-    if(includePlainLabelFeatures) {
+    if (includePlainLabelFeatures) {
       for(i <- 0 until firstIndex.size) {
         val w = weights(i)
-        if(w != 0.0)
+        if (w != 0.0)
           vbuilder.add(i, w)
       }
     }
 
-    if(numHashFeatures == 0) {
+    if (numHashFeatures == 0) {
       // if no hash features, we can just iterate over the enumerated part of the index
       for(((l, s), i) <- (labelPartOfFeature zip surfacePartOfFeature).zipWithIndex) {
         val w = weights(i + labelOnlySize)
-        if(w != 0.0)
+        if (w != 0.0)
           builder.add(l, s, w)
       }
     } else {
       // otherwise, check everything
       for(l <- 0 until firstIndex.size; s <- 0 until secondIndex.size) {
         val i = mapped(l, s)
-        if(i >= 0 && weights(i) != 0) {
+        if (i >= 0 && weights(i) != 0) {
           builder.add(l, s, weights(i))
         }
       }
     }
-
 
     (builder.result(), vbuilder.toSparseVector(true, true))
   }
@@ -175,7 +170,7 @@ class CrossProductIndex[A, B] private (val firstIndex: Index[A],
    */
   def prune(shouldPrune: Int=>Boolean, rebuildSurfaceIndex: Boolean = true):CrossProductIndex[A, B] = {
     val newSecondIndex = Index[B]()
-    def newIndexOf(b: Int) = if(rebuildSurfaceIndex) newSecondIndex.index(secondIndex.get(b)) else b
+    def newIndexOf(b: Int) = if (rebuildSurfaceIndex) newSecondIndex.index(secondIndex.get(b)) else b
     def alreadyInNewIndex(b: Int) = !rebuildSurfaceIndex || newSecondIndex.contains(secondIndex.get(b))
     val mapping = Array.fill(firstIndex.size)(new OpenAddressHashArray[Int](secondIndex.size max 1, -1, 4))
     val newLabelPart, newSurfacePart = new ArrayBuffer[Int]()
@@ -211,7 +206,7 @@ class CrossProductIndex[A, B] private (val firstIndex: Index[A],
     }
 
     new CrossProductIndex(firstIndex,
-      if(rebuildSurfaceIndex) newSecondIndex else secondIndex,
+      if (rebuildSurfaceIndex) newSecondIndex else secondIndex,
       mapping,
       newLabelPart.toArray, newSurfacePart.toArray,
       id, includePlainLabelFeatures,
@@ -240,12 +235,12 @@ object CrossProductIndex {
                       val includeLabelOnlyFeatures: Boolean = true,
                       minCount: Int = 1,
                       seenSet: LockableSeenSet[Long] = LockableSeenSet.always) extends SafeLogging {
-    def add(a: A, b: B):Int = add(firstIndex(a), secondIndex(b))
+    def add(a: A, b: B): Int = add(firstIndex(a), secondIndex(b))
 
     private val counts = Array.fill(firstIndex.size)(new OpenAddressHashArray[Int](secondIndex.size max 1, 0, 4))
     private val mapping = Array.fill(firstIndex.size)(new OpenAddressHashArray[Int](secondIndex.size max 1, -1, 4))
     private val labelPart, surfacePart = new ArrayBuffer[Int]()
-    private val labelOnlySize: Int = if(includeLabelOnlyFeatures) firstIndex.size else 0
+    private val labelOnlySize: Int = if (includeLabelOnlyFeatures) firstIndex.size else 0
 
     def size = labelPart.size + labelOnlySize
 
@@ -257,14 +252,14 @@ object CrossProductIndex {
       secondArray.map(add(first, _))
     }
 
-    def add(first: Int, second: Int):Int = {
-      if(first < 0 || second < 0) {
+    def add(first: Int, second: Int): Int = {
+      if (first < 0 || second < 0) {
         -1
       } else {
         val currentIndex: Int = mapping(first)(second)
-        if(currentIndex == -1) {
+        if (currentIndex == -1) {
           val currentCount = counts(first)(second)
-          if(minCount <= 1 || currentCount + 1 >= minCount) {
+          if (minCount <= 1 || currentCount + 1 >= minCount) {
             val x = size
             mapping(first)(second) = x
             labelPart += first

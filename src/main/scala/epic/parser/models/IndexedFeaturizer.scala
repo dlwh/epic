@@ -38,7 +38,6 @@ class IndexedFeaturizer[L, L2, W](val index: CrossProductIndex[Feature, Feature]
                                    indexedProjections: GrammarRefinements[L, L2],
                                    ruleCache: Array[Array[Int]]) extends RefinedFeaturizer[L, W, Feature] with Encoder[Feature] with Serializable { outer =>
 
-
   import indexedProjections._
 
   def labelIndex = labels.fineIndex
@@ -48,7 +47,6 @@ class IndexedFeaturizer[L, L2, W](val index: CrossProductIndex[Feature, Feature]
   def computeWeight(r: Int, weights: DenseVector[Double]): Double = new FeatureVector(ruleCache(r)) dot weights
 
   def anchor(words: IndexedSeq[W]) = new Spec(words)
-
 
   case class Spec private[IndexedFeaturizer](words: IndexedSeq[W]) extends super.Anchoring {
     val anch = wGen.anchor(words)
@@ -74,11 +72,8 @@ class IndexedFeaturizer[L, L2, W](val index: CrossProductIndex[Feature, Feature]
       index.crossProduct(feat.featuresForLabel(tag), anch.featuresForWord(pos), usePlainLabelFeatures = false)
     }
 
-
     def computeWeight(pos: Int, l: Int, weights: DenseVector[Double]) = new FeatureVector(featuresFor(pos, l)) dot weights
   }
-
-
 
 }
 

@@ -16,14 +16,13 @@ trait ModelSelector[+T, Loader <: ModelLoader[T]] {
 
   private lazy val serviceLoader = ServiceLoader.load(manifest.runtimeClass.asInstanceOf[Class[Loader]], classLoader)
 
-  def findModel(features: String*):Option[Loader] = {
-    findModel{x => lazy val a = x.capabilities.toSet; features.forall(a)}
+  def findModel(features: String*): Option[Loader] = {
+    findModel{ x => lazy val a = x.capabilities.toSet; features.forall(a) }
   }
 
-  def findModel(filter: Loader=>Boolean) = serviceLoader.synchronized {
+  def findModel(filter: Loader => Boolean) = serviceLoader.synchronized {
     serviceLoader.asScala.find(filter)
   }
-
 
 }
 

@@ -40,14 +40,13 @@ object FilterTreesByLength {
 
     for ( (gold, guess) <- getTrees(gold) zip getTrees(params.guess)) {
       assert(gold._2 == guess._2)
-      val len = (if(ignorePunct) gold._2.count(!_.forall(!_.isLetterOrDigit)) else gold._2.length)/bucketSize * bucketSize
+      val len = (if (ignorePunct) gold._2.count(!_.forall(!_.isLetterOrDigit)) else gold._2.length)/bucketSize * bucketSize
       goldOut(len).println(gold._1.render(gold._2, newline = false))
       guessOut(len).println(guess._1.render(guess._2, newline = false))
     }
 
     goldOut.values.foreach(_.close())
     guessOut.values.foreach(_.close())
-
 
   }
 

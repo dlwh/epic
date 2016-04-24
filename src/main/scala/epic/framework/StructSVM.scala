@@ -25,7 +25,7 @@ class StructSVM[Datum](val model: Model[Datum],
     for(i <- 0 until maxIter if !converged) {
       val newWeights = weights.copy
       for(i <- 0 until  numBatches) {
-        val smoTol = if(i < 5) math.pow(10, -(i + 1)) else 1E-6
+        val smoTol = if (i < 5) math.pow(10, -(i + 1)) else 1E-6
         val inf = model.inferenceFromWeights(newWeights)
         val batch = Rand.subsetsOfSize(data, batchSize).draw()
         constraints ++= findNewConstraints(inf, batch)
@@ -88,10 +88,10 @@ class StructSVM[Datum](val model: Model[Datum],
     val newAlphas = Array.newBuilder[Double]
     val newConstraints = new ArrayBuffer[Constraint]()
     for( i <- 0 until alphas.length) {
-      if(alphas(i).abs < 1E-5) constraints(i).age += 1
+      if (alphas(i).abs < 1E-5) constraints(i).age += 1
       else constraints(i).age = 0
 
-      if(constraints(i).age < MAX_CONSTRAINT_AGE) {
+      if (constraints(i).age < MAX_CONSTRAINT_AGE) {
         newConstraints += constraints(i)
         newAlphas += alphas(i)
       }
@@ -107,11 +107,11 @@ class StructSVM[Datum](val model: Model[Datum],
                   alphas: DenseVector[Double],
                   constraints: IndexedSeq[Constraint],
                   smoTol: Double): Unit = {
-    if(alphas.sum < C) {
+    if (alphas.sum < C) {
       alphas += (C-alphas.sum)/alphas.length
     }
     for(i <- 0 until alphas.length) {
-      if(alphas(i) != 0.0) {
+      if (alphas(i) != 0.0) {
         constraints(i).axpy(alphas(i), weights)
       }
     }
@@ -124,11 +124,11 @@ class StructSVM[Datum](val model: Model[Datum],
         val oldA1 = alphas(i)
         val j = perm(i)
         val oldA2 = alphas(j)
-        if( (oldA1 != 0 && oldA2 != 0)) {
+        if ( (oldA1 != 0 && oldA2 != 0)) {
           val con2 = constraints(j)
           var t = ((con1.loss - con2.loss) - ( (con2.dot(weights)) - (con1.dot(weights))))/(con1.ftf + con2.ftf)
           val tt = t
-          if(!t.isNaN && t != 0.0) {
+          if (!t.isNaN && t != 0.0) {
             t = t max (-oldA1)
             val newA1 = (oldA1 + t) min (oldA1 + oldA2)
             val newA2 = (oldA2 - t) max 0

@@ -9,7 +9,6 @@ import scala.collection.mutable
  */
 package object epic {
 
-
   implicit class AwesomeBitSet(val bs: java.util.BitSet) extends AnyVal {
     def apply(r: Int) = bs.get(r)
 
@@ -27,7 +26,7 @@ package object epic {
 
     def foreach[U](f: Int=>U) {
       var i = bs.nextSetBit(0)
-      while(i != -1) {
+      while (i != -1) {
         f(i)
         i = bs.nextSetBit(i+1)
       }
@@ -112,6 +111,17 @@ package object epic {
   implicit class AwesomeScalaBitSet(val bs: collection.BitSet) extends AnyVal {
     def toJavaBitSet = {
       java.util.BitSet.valueOf(bs.toBitMask)
+    }
+  }
+
+  implicit class AwesomeArrayOps(val xs: Array.type) {
+    def fillWith[T : Manifest](size: Int)(f: Int => T): Array[T] = {
+      var i = 0
+      Array.fill[T](size) {
+        val x = f(i)
+        i += 1
+        x
+      }
     }
   }
 

@@ -21,7 +21,7 @@ class Word2VecIndexed[W](private val wordIndex: Index[W],
                          private val word2vec: Array[Array[Double]],
                          private val converter: W => W) extends Serializable {
   
-  def wordRepSize = word2vec.head.size
+  def wordRepSize = word2vec.head.length
   def vocSize = wordIndex.size
     
   val zeroVector = Array.tabulate(wordRepSize)(i => 0.0)
@@ -39,7 +39,7 @@ class Word2VecIndexed[W](private val wordIndex: Index[W],
   }
   
   def augment(numSparseFeats: Int, featurizer: W => Array[Int]): Word2VecIndexed[W] = {
-    val newWord2Vec = Array.tabulate(word2vec.size)(i => {
+    val newWord2Vec = Array.tabulate(word2vec.length)(i => {
       val word = wordIndex.get(i)
       val feats = featurizer(word)
       word2vec(i) ++ Array.tabulate(numSparseFeats)(j => if (feats.contains(j)) 1.0 else 0.0)
@@ -62,20 +62,20 @@ object Word2VecIndexed {
 }
 
 trait WordVectorAnchoringIndexed[String] {
-  def reducedFeaturesForSpan(start: Int, end: Int): Array[Int];
-  def featuresForSpan(start: Int, end: Int): Array[Int];
-  def featuresForSplit(start: Int, split: Int, end: Int): Array[Int];
+  def reducedFeaturesForSpan(start: Int, end: Int): Array[Int]
+  def featuresForSpan(start: Int, end: Int): Array[Int]
+  def featuresForSplit(start: Int, split: Int, end: Int): Array[Int]
 }
 
 class Word2VecSurfaceFeaturizerIndexed[W](val word2vecIndexed: Word2VecIndexed[W],
                                           val featureSpec: String) extends Serializable {
   
   def reducedInputSize = {
-    anchor(IndexedSeq[W]()).reducedFeaturesForSpan(0, 0).size * word2vecIndexed.wordRepSize
+    anchor(IndexedSeq[W]()).reducedFeaturesForSpan(0, 0).length * word2vecIndexed.wordRepSize
   }
   
   def splitInputSize = {
-    anchor(IndexedSeq[W]()).featuresForSplit(0, 0, 0).size * word2vecIndexed.wordRepSize
+    anchor(IndexedSeq[W]()).featuresForSplit(0, 0, 0).length * word2vecIndexed.wordRepSize
   }
   
   def anchor(words: IndexedSeq[W]): WordVectorAnchoringIndexed[W] = {
@@ -154,8 +154,8 @@ object Word2VecSurfaceFeaturizerIndexed {
 
 
 trait WordVectorDepAnchoringIndexed[String] {
-  def getHeadDepPair(begin: Int, split: Int, end: Int, rule: Int): (Int, Int);
-  def featuresForHeadPair(head: Int, dep: Int): Array[Int];
+  def getHeadDepPair(begin: Int, split: Int, end: Int, rule: Int): (Int, Int)
+  def featuresForHeadPair(head: Int, dep: Int): Array[Int]
 }
 
 class Word2VecDepFeaturizerIndexed[W](val word2VecIndexed: Word2VecIndexed[W],
@@ -165,21 +165,21 @@ class Word2VecDepFeaturizerIndexed[W](val word2VecIndexed: Word2VecIndexed[W],
   val hackyHeadFinder: HackyHeadFinder[String,String] = new RuleBasedHackyHeadFinder
     
   def anchor(words: IndexedSeq[W]): WordVectorDepAnchoringIndexed[W] = {
-    val indexedWords = words.map(word2VecIndexed.indexWord(_))
+    val indexedWords = words.map(word2VecIndexed.indexWord)
     new WordVectorDepAnchoringIndexed[W] {
       
-      val preterminals = new Array[String](words.size);
-      for (i <- 0 until words.size) {
-        preterminals(i) = tagger.tag(words(i));
+      val preterminals = new Array[String](words.size)
+      words.indices.foreach { i =>
+        preterminals(i) = tagger.tag(words(i))
       }
       
       def getHeadDepPair(begin: Int, split: Int, end: Int, rule: Int): (Int, Int) = {
-        val lc = topology.labelIndex.get(topology.leftChild(rule)).baseLabel;
-        val rc = topology.labelIndex.get(topology.rightChild(rule)).baseLabel;
-        val parent = topology.labelIndex.get(topology.parent(rule)).baseLabel;
+        val lc = topology.labelIndex.get(topology.leftChild(rule)).baseLabel
+        val rc = topology.labelIndex.get(topology.rightChild(rule)).baseLabel
+        val parent = topology.labelIndex.get(topology.parent(rule)).baseLabel
       
-        val lcHeadIdx = begin + hackyHeadFinder.findHead(lc, preterminals.slice(begin, split));
-        val rcHeadIdx = split + hackyHeadFinder.findHead(rc, preterminals.slice(split, end));
+        val lcHeadIdx = begin + hackyHeadFinder.findHead(lc, preterminals.slice(begin, split))
+        val rcHeadIdx = split + hackyHeadFinder.findHead(rc, preterminals.slice(split, end))
         val overallHeadIdx = begin + hackyHeadFinder.findHead(parent, preterminals.slice(begin, end))
         if (overallHeadIdx == rcHeadIdx) {
           (rcHeadIdx, lcHeadIdx)
@@ -205,28 +205,28 @@ trait Tagger[W] {
 
 class FrequencyTagger[W](wordTagCounts: Counter2[String, W, Double]) extends Tagger[W] with Serializable {
   
-  private val wordCounts = Counter[W,Double];
-  private val wordToTagMap = new HashMap[W,String];
+  private val wordCounts = Counter[W,Double]
+  private val wordToTagMap = new HashMap[W,String]
   for (word <- wordTagCounts.keysIterator.map(_._2).toSeq.distinct) {
-    wordCounts(word) = sum(wordTagCounts(::, word));
+    wordCounts(word) = sum(wordTagCounts(::, word))
     if (!wordToTagMap.contains(word)) {
-      val tagCounts = wordTagCounts(::, word).iterator;
-      var bestTag = HackyLexicalProductionFeaturizer.UnkTag;
-      var bestTagCount = 0.0;
+      val tagCounts = wordTagCounts(::, word).iterator
+      var bestTag = HackyLexicalProductionFeaturizer.UnkTag
+      var bestTagCount = 0.0
       for ((tag, count) <- tagCounts) {
         if (count > bestTagCount) {
-          bestTag = tag;
-          bestTagCount = count;
+          bestTag = tag
+          bestTagCount = count
         }
       }
-      wordToTagMap.put(word, bestTag);
+      wordToTagMap.put(word, bestTag)
     }
   }
   val tagTypesIdx = Index[String]
   wordToTagMap.values.toSet[String].foreach(tagType => tagTypesIdx.index(tagType))
   tagTypesIdx.index(HackyLexicalProductionFeaturizer.UnkTag)
   
-  def tag(word: W) = if (wordToTagMap.contains(word)) wordToTagMap(word) else HackyLexicalProductionFeaturizer.UnkTag;
+  def tag(word: W) = if (wordToTagMap.contains(word)) wordToTagMap(word) else HackyLexicalProductionFeaturizer.UnkTag
   
   def convertToFeaturizer: W => Array[Int] = (word: W) => Array(tagTypesIdx.index(tag(word)))
 }

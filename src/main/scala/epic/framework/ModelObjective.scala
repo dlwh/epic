@@ -22,7 +22,7 @@ import epic.trees.TreeInstance
 class ModelObjective[Datum](val model: Model[Datum],
                             batchSelector: IndexedSeq[Int]=>GenTraversable[Datum],
                             val fullRange: IndexedSeq[Int]) extends BatchDiffFunction[DenseVector[Double]] with SafeLogging {
-  def this(model: Model[Datum], data: IndexedSeq[Datum], numThreads: Int = -1) = this(model,ModelObjective.makePar(data, numThreads)(_), 0 until data.length)
+  def this(model: Model[Datum], data: IndexedSeq[Datum], numThreads: Int = -1) = this(model,ModelObjective.makePar(data, numThreads)(_), data.indices)
 
   import model.{ExpectedCounts => _, _}
 
@@ -40,7 +40,7 @@ class ModelObjective[Datum](val model: Model[Datum],
      case Some(vector) => vector
      case None => Encoder.fromIndex(featureIndex).tabulateDenseVector(f => model.initialValueForFeature(f))
    }
-    if(randomize) {
+    if (randomize) {
       // Control the seed of the RNG for the weights
       val rng = new scala.util.Random(0)
       v += DenseVector(Array.tabulate(numFeatures)(i => rng.nextDouble * 2.0 * scale - scale))
@@ -51,7 +51,7 @@ class ModelObjective[Datum](val model: Model[Datum],
   var timeSinceLastWrite = 0L
   var nextSave = 5L * 20 * 1000
   def calculate(x: DenseVector[Double], batch: IndexedSeq[Int]) = {
-    if(timeSinceLastWrite > nextSave) {
+    if (timeSinceLastWrite > nextSave) {
       logger.info("Saving feature weights...")
       val timeIn = System.currentTimeMillis()
       model.cacheFeatureWeights(x)
@@ -73,10 +73,10 @@ class ModelObjective[Datum](val model: Model[Datum],
       } catch {
         case e: Exception =>
           e.printStackTrace()
-//          new Exception("While processing " + datum, e).printStackTrace()
+          // new Exception("While processing " + datum, e).printStackTrace()
           _countsSoFar
       }
-    },{ (a,b) => if(a eq null) b else if (b eq null) a else b += a})
+    },{ (a,b) => if (a eq null) b else if (b eq null) a else b += a})
     val timeOut = System.currentTimeMillis()
     timeSinceLastWrite += timeOut - timeIn
     logger.info(f"Inference took: ${(timeOut - timeIn) * 1.0/1000}%.3fs" )

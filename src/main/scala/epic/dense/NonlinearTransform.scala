@@ -26,7 +26,7 @@ case class NonlinearTransform[FV](nonLinType: String, size: Int, inner: Transfor
       }
       new Layer(fcn, inner.extractLayer(dv, forTrain))
     } else {
-      val nonlinearFcn = NonlinearTransform.getNonlinearFcn(nonLinType);
+      val nonlinearFcn = NonlinearTransform.getNonlinearFcn(nonLinType)
       new Layer(nonlinearFcn, inner.extractLayer(dv, forTrain))
     }
   }
@@ -41,11 +41,11 @@ case class NonlinearTransform[FV](nonLinType: String, size: Int, inner: Transfor
     
     val myIndex = Index[Feature]
     
-    def index = myIndex;
+    def index = myIndex
 
     def activations(fv: FV): DenseVector[Double] = {
       val act = innerLayer.activations(fv)
-      var i = 0;
+      var i = 0
       while (i < act.size) {
         act(i) = nonlinearFcn.fcn(i, act(i))
         i += 1
@@ -56,7 +56,7 @@ case class NonlinearTransform[FV](nonLinType: String, size: Int, inner: Transfor
     def tallyDerivative(deriv: DenseVector[Double], _scale: =>Vector[Double], fv: FV) = {
       val scale = _scale
       val act = innerLayer.activations(fv)
-      var i = 0;
+      var i = 0
       while (i < act.size) {
         act(i) = nonlinearFcn.deriv(i, act(i))
         i += 1
@@ -94,8 +94,8 @@ object NonlinearTransform {
   trait NonlinearFcn {
     // idx is the position of the unit; this basically only applies to dropout
     // where we want to zero out particular units
-    def fcn(idx: Int, x: Double): Double;
-    def deriv(idx: Int, x: Double): Double;
+    def fcn(idx: Int, x: Double): Double
+    def deriv(idx: Int, x: Double): Double
   }
   
   case class Constant() extends NonlinearFcn {
@@ -103,17 +103,17 @@ object NonlinearTransform {
     def deriv(idx: Int, x: Double) = 0
   }
   
-  case class Mask(val mask: Array[Boolean]) extends NonlinearFcn {
+  case class Mask(mask: Array[Boolean]) extends NonlinearFcn {
     def fcn(idx: Int, x: Double) = if (mask(idx)) x else 0
     def deriv(idx: Int, x: Double) = if (mask(idx)) 1 else 0
   }
   
-  case class ShiftAndScaleEach(val shifts: Array[Double], val factors: Array[Double]) extends NonlinearFcn {
+  case class ShiftAndScaleEach(shifts: Array[Double], factors: Array[Double]) extends NonlinearFcn {
     def fcn(idx: Int, x: Double) = factors(idx) * (x - shifts(idx))
     def deriv(idx: Int, x: Double) = factors(idx)
   }
   
-  case class Scale(val factor: Double) extends NonlinearFcn {
+  case class Scale(factor: Double) extends NonlinearFcn {
     def fcn(idx: Int, x: Double) = factor * x
     def deriv(idx: Int, x: Double) = factor
   }

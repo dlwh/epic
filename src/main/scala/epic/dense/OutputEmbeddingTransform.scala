@@ -17,7 +17,6 @@ import scala.util.Random
  */
 case class OutputEmbeddingTransform[FV](numOutputs: Int, outputDim: Int, innerTransform: Transform[FV, DenseVector[Double]], coarsenerForInitialization: Option[Int => Int] = None) extends OutputTransform[FV, DenseVector[Double]] {
 
-
   val index = SegmentedIndex(new AffineTransform.Index(numOutputs, outputDim, true),
                              innerTransform.index)
   
@@ -30,12 +29,12 @@ case class OutputEmbeddingTransform[FV](numOutputs: Int, outputDim: Int, innerTr
   
   def clipEmbeddingNorms(weights: DenseVector[Double]) {
     val embeddings = weights(index.componentOffset(1) until index.componentOffset(1) + (numOutputs * outputDim)).asDenseMatrix.reshape(numOutputs, outputDim, view = View.Require)
-    OutputEmbeddingTransform.clipEmbeddingNorms(embeddings);
+    OutputEmbeddingTransform.clipEmbeddingNorms(embeddings)
   }
   
   def displayEmbeddingNorms(weights: DenseVector[Double]) {
     val embeddings = weights(index.componentOffset(1) until index.componentOffset(1) + (numOutputs * outputDim)).asDenseMatrix.reshape(numOutputs, outputDim, view = View.Require)
-    OutputEmbeddingTransform.displayEmbeddingNorms(embeddings);
+    OutputEmbeddingTransform.displayEmbeddingNorms(embeddings)
   }
   
   def initialWeightVector(initWeightsScale: Double, rng: Random, outputLayer: Boolean, spec: String) = {

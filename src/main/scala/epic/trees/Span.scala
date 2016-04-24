@@ -30,16 +30,16 @@ class Span(val encoded: Long) extends AnyVal with Serializable {
 
   def length = end - begin
 
-  def map[U](f: Int=>U) = Range(begin,end).map(f)
+  def map[U](f: Int => U) = Range(begin, end).map(f)
 
   @inline
-  def foreach(f: Int=>Unit) = {
+  def foreach(f: Int => Unit) = {
     cfor.cfor(begin)(_ < end, _ +1) { f }
   }
 
   def iterator = toRange.iterator
 
-  def toRange = Range(begin,end)
+  def toRange = Range(begin, end)
 
   def contains(pos: Int) = pos >= begin && pos < end
 
@@ -53,7 +53,6 @@ class Span(val encoded: Long) extends AnyVal with Serializable {
     ||  (other.begin < begin && other.end < end && other.end > begin)
   )
 
-
 //  override def hashCode(): Int = {
 //    (begin, end).hashCode()
 //  }
@@ -66,7 +65,7 @@ class Span(val encoded: Long) extends AnyVal with Serializable {
   /**
   * Return true if this' range contains the other range.
   */
-  def contains(other:Span) = {
+  def contains(other: Span) = {
     begin <= other.begin && end >= other.end
   }
 
@@ -77,6 +76,5 @@ class Span(val encoded: Long) extends AnyVal with Serializable {
 
 object Span {
   def apply(begin: Int, end: Int) = new Span((begin.toLong << 32) | (end.toLong&0xFFFFFFFFL))
-
   def unapply(span: Span) = Some((span.begin, span.end))
 }

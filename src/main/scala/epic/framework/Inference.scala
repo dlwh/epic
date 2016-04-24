@@ -61,8 +61,6 @@ trait Inference[Datum] extends Serializable {
   def forTesting: Inference[Datum] = this
 }
 
-
-
 /**
  * AugmentableInference is an [[epic.framework.Inference]] that can support injecting
  * additional information into the structure computation. This can include

@@ -7,8 +7,7 @@ import epic.util.SafeLogging
  * A simple lexicon that thresholds to decide when to open up the rare word to all (open) tags
  */
 @SerialVersionUID(1L)
-class SignatureLexicon[L, W](val labelIndex: Index[L], allowed: Map[W, Set[Int]], signature: W=>W) extends Lexicon[L, W] with Serializable with SafeLogging {
-
+class SignatureLexicon[L, W](val labelIndex: Index[L], allowed: Map[W, Set[Int]], signature: W => W) extends Lexicon[L, W] with Serializable with SafeLogging {
 
   override def morePermissive: Lexicon[L, W] = {
     new SignatureLexicon(labelIndex, Map.empty[W, Set[Int]].withDefaultValue(allTags), signature)
@@ -27,7 +26,6 @@ class SignatureLexicon[L, W](val labelIndex: Index[L], allowed: Map[W, Set[Int]]
 
     def length: Int = words.length
   }
-
 
 }
 

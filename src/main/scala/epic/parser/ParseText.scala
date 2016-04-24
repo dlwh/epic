@@ -10,7 +10,6 @@ import epic.models.ParserSelector
  */
 object ParseText extends ProcessTextMain[Parser[AnnotatedLabel, String], Tree[AnnotatedLabel]] {
 
-
   override def render(model: Parser[AnnotatedLabel, String], ann: Tree[AnnotatedLabel], tokens: IndexedSeq[String]): String = {
     ann.render(tokens, newline = false)
   }

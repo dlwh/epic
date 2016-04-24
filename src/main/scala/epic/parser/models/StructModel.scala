@@ -56,7 +56,6 @@ class StructModel[L, L2, W](indexedFeatures: IndexedFeaturizer[L, L2, W],
                         initialFeatureVal: (Feature => Option[Double]) = { _ => None }) extends ParserModel[L, W] with Serializable {
   type Inference = AnnotatedParserInference[L, W]
 
-
   def featureIndex = indexedFeatures.index
 
   override def initialValueForFeature(f: Feature) = initialFeatureVal(f) getOrElse 0.0
@@ -71,7 +70,6 @@ class StructModel[L, L2, W](indexedFeatures: IndexedFeaturizer[L, L2, W],
     new AnnotatedParserInference(indexedFeatures, reannotate, grammar, constrainer)
   }
 
-
   def accumulateCounts(inf: Inference, s: Scorer, d: TreeInstance[L, W], m: Marginal, accum: ExpectedCounts, scale: Double): Unit = {
     m.expectedCounts(indexedFeatures, accum, scale)
   }
@@ -84,14 +82,13 @@ case class StructModelFactory(@Help(text= "The kind of annotation to do on the r
                               annotatedTreesDumpPath: File = null) extends ParserModelFactory[AnnotatedLabel, String] {
   type MyModel = StructModel[AnnotatedLabel, AnnotatedLabel, String]
 
-
   override def make(trainTrees: IndexedSeq[TreeInstance[AnnotatedLabel, String]],
                     topology: RuleTopology[AnnotatedLabel],
                     lexicon: Lexicon[AnnotatedLabel, String],
                     constrainer: Factory[AnnotatedLabel, String]): MyModel = {
     val transformed = trainTrees.par.map(annotator).seq.toIndexedSeq
 
-    if(annotatedTreesDumpPath != null) {
+    if (annotatedTreesDumpPath != null) {
       val ps = new PrintStream(new FileOutputStream(annotatedTreesDumpPath))
       for( (x,y) <- trainTrees zip transformed) {
         ps.println("Treebank:\n" + x.render() + "\nAnnotated:\n" + y.render() + "\n==========\n")
@@ -106,13 +103,10 @@ case class StructModelFactory(@Help(text= "The kind of annotation to do on the r
     val surfaceFeaturizer = {
       val dsl = new WordFeaturizer.DSL(initLexicon)
       import dsl._
-
-      (
-        unigrams(word + clss, 1)
-          + suffixes()
-          + prefixes()
-          + props
-        )
+      unigrams(word + clss, 1) +
+        suffixes() +
+        prefixes() +
+        props
     }
     val wordFeaturizer = IndexedWordFeaturizer.fromData(surfaceFeaturizer, transformed.map{_.words})
     def labelFlattener(l: AnnotatedLabel): Seq[AnnotatedLabel] = {

@@ -10,7 +10,6 @@ import epic.trees.Span
 
 import MascTransform._
 
-
 /**
 * Convert native MASC xml into CONLL format for named entity recognition.
 *
@@ -18,13 +17,11 @@ import MascTransform._
 */
 object MascTransform {
 
-
   case class MNode(id: String, targets: Seq[String])
   case class MAnnotation(id: String, label: String, ref: String, features: Map[String,String])
   case class MEdge(id: String, from: String, to: String)
   case class MRegion(id: String, start: Int, end: Int) extends Ordered[MRegion] {
     def span = Span(start, end)
-
     def compare(that: MRegion) = this.start - that.start
   }
 
@@ -32,9 +29,7 @@ object MascTransform {
     val mascDir = args(0)
     val outputDir = new File(if (args.length > 1) args(1) else "/tmp")
     outputDir.mkdirs
-
     val targets = collectTargets(new File(mascDir))
-
     // Get 3/5 for train, 1/5 for dev, and 1/5 for test
     val targetsAndIndices = targets.zipWithIndex
     val trainSet = targetsAndIndices.filter(_._2 % 5 < 3).unzip._1
@@ -57,11 +52,9 @@ object MascTransform {
     System.err.println("Creating " + outputName)
     val outputDir = new File(parentDir, outputName)
     outputDir.mkdirs
-
     val outputSentences = new FileWriter(new File(outputDir,outputName+"-sent.txt"))
     val outputTokens = new FileWriter(new File(outputDir,outputName+"-tok.txt"))
     val outputNer = new FileWriter(new File(outputDir,outputName+"-ner.txt"))
-
     for (mfile <- MascFile(targets)) {
       for (sentence <- mfile.sentences) {
         val tokenizedSentence = new StringBuffer
@@ -102,7 +95,6 @@ case class MascSentence (
   bioLabels: Seq[String],
   orderedRegions: Seq[MRegion]
 ) {
-
   lazy val numTokens = orderedTokens.length
 }
 
@@ -112,9 +104,7 @@ class MascFile (
   val rawtext: String,
   val sentences: Seq[MascSentence]
 ) {
-
   lazy val numSentences = sentences.length
-
 }
 
 object MascFile {
@@ -125,7 +115,7 @@ object MascFile {
   lazy val outsideNe = MAnnotation("outside", "outside", "none", Map[String,String]())
 
   def apply(targets: Seq[(File, String)]): Iterator[MascFile] = {
-    targets.toIterator.flatMap { case(file, prefix) => {
+    targets.toIterator.flatMap { case(file, prefix) =>
       try {
         val mfile = MascFile(file,prefix)
         System.err.println("Success: " + file + "," + prefix)
@@ -135,7 +125,7 @@ object MascFile {
         System.err.println("Failure: " + file + "," + prefix)
         None
       }
-    }}
+    }
   }
 
   def apply(dir: File, prefix: String): MascFile = {
@@ -152,34 +142,33 @@ object MascFile {
     val sentenceXml = loadXML(dirFile(prefix+"-s.xml"))
     val sentenceRegions = getRegions(sentenceXml).sorted
 
-    
     // Basic segment information
     val segmentXml = loadXML(dirFile(prefix+"-seg.xml"))
-    val segmentRegions = getRegions(segmentXml).map(r => (r.id -> r)).toMap
+    val segmentRegions = getRegions(segmentXml).map(r => r.id -> r).toMap
 
     // POS information
     val pennXml = loadXML(dirFile(prefix+"-penn.xml"))
 
     val tokenRegions = getNodes(pennXml).map { n =>
       val regions = n.targets.map(segmentRegions).sorted
-      (n.id -> MRegion(n.id, regions.head.start, regions.last.end))
+      n.id -> MRegion(n.id, regions.head.start, regions.last.end)
     }.toMap
 
     val tokens = tokenRegions.mapValues(region => rawtext.slice(region.start, region.end))
-    val posAnnotations = getAnnotations(pennXml).map(anno => (anno.ref -> anno)).toMap
+    val posAnnotations = getAnnotations(pennXml).map(anno => anno.ref -> anno).toMap
 
     // NER information
     val neXml = loadXML(dirFile(prefix+"-ne.xml"))
     val neAnnotations =
-      getAnnotations(neXml).map(anno => (anno.ref -> anno)).toMap.withDefault(x=>outsideNe)
+      getAnnotations(neXml).map(anno => anno.ref -> anno).toMap.withDefault(x=>outsideNe)
 
     val neEdges =
-      getEdges(neXml).map(edge => (edge.to -> edge.from)).toMap.withDefault(x=>"outside")
+      getEdges(neXml).map(edge => edge.to -> edge.from).toMap.withDefault(x=>"outside")
 
     // A helper function for pulling out the information associated with a
     // subsequence of the tokens in the document.
     def orderedTokPosNer(orderedRegions: Seq[MRegion]) = {
-      if (orderedRegions.length == 0) None
+      if (orderedRegions.isEmpty) None
       else {
         val orderedTokens = orderedRegions.map(reg=>tokens(reg.id))
         
@@ -202,7 +191,6 @@ object MascFile {
       }
     }
 
-
     // Insert the "missing" sentences. (Content not marked as a sentence,
     // but containing tokens.)
     
@@ -223,7 +211,7 @@ object MascFile {
     // Pull out the sequence of token, pos, and NE for each sentence.
     val allOrderedTokRegions = tokenRegions.values.toIndexedSeq.sorted
     var index = 0
-    val allDataBySentence = paddedSentenceRegions.flatMap { region => {
+    val allDataBySentence = paddedSentenceRegions.flatMap { region =>
       //val startIndex = math.max(index, region.start)
       val startIndex = math.max(index, allOrderedTokRegions.indexWhere(t=>t.start>=region.start,index))
       //val startIndex = index
@@ -236,7 +224,7 @@ object MascFile {
         index = endIndex
         orderedTokPosNer(sentence)
       }
-    }}
+    }
 
     new MascFile(dir, prefix, rawtext, allDataBySentence)
   }
@@ -260,15 +248,14 @@ object MascUtil {
     "date" -> "MISC"
   ).withDefault(x=>"O")
 
-
   def getRegions(doc: Elem) = (doc \\ "region").toSeq.map { rxml =>
     val Array(start, end) = (rxml \ "@anchors").toString.split(" ")
     MRegion(xmlId(rxml), start.toInt, end.toInt)
   }
     
   def getNodes(doc: Elem) = (doc \\ "node").toSeq.flatMap { nxml =>
-    val link = (nxml \ "link")
-    if (!link.isEmpty) {
+    val link = nxml \ "link"
+    if (link.nonEmpty) {
       val targets = (link.head \ "@targets").toString.split(" ").toSeq
       Some(MNode(xmlId(nxml), targets))
     } else throw new Exception("Missing link element.") //None OK?
@@ -386,7 +373,7 @@ object MascSlab {
     val neXml = XML.load(source.url.toString().replaceAll("[.]txt$", "-ne.xml"))
     
     val idToPos = (for ((span, p) <- slab.iterator[PartOfSpeech]; id <- p.id.iterator) yield id -> (span, p)).toMap
-    val neIdPosIdTuples = MascUtil.getEdges(neXml).map(e => (e.from -> e.to))
+    val neIdPosIdTuples = MascUtil.getEdges(neXml).map(e => e.from -> e.to)
     val neIdToPosIds = neIdPosIdTuples.groupBy(_._1).mapValues(_.map(_._2))
     
     val entityMentions = for (annotation <- MascUtil.getAnnotations(neXml)) yield {

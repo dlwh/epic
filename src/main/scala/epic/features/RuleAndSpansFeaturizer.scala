@@ -1,4 +1,5 @@
-package epic.features
+package epic
+package features
 
 import epic.framework.Feature
 import breeze.util.Index
@@ -17,36 +18,28 @@ trait RuleAndSpansFeaturizer[W] extends Serializable {
   }
 }
 
-
 class ZeroRuleAndSpansFeaturizer[W]() extends RuleAndSpansFeaturizer[W] {
-  val emptyArray = Array[Feature]();
+  val emptyArray = Array[Feature]()
   
   def anchor(w: IndexedSeq[W]) = new Anchoring {
-    def words = w;
+    def words = w
     
-    def featuresForBinaryRule(begin: Int, split: Int, end: Int, rule: Int, ref: Int) = emptyArray;
-    def featuresForUnaryRule(begin: Int, end: Int, rule: Int, ref: Int) = emptyArray;
-    def featuresForSpan(begin: Int, end: Int, tag: Int, ref: Int) = emptyArray;
+    def featuresForBinaryRule(begin: Int, split: Int, end: Int, rule: Int, ref: Int) = emptyArray
+    def featuresForUnaryRule(begin: Int, end: Int, rule: Int, ref: Int) = emptyArray
+    def featuresForSpan(begin: Int, end: Int, tag: Int, ref: Int) = emptyArray
   }
 }
 
 object RuleAndSpansFeaturizer {
   
-  def indexAndOffset(index: Index[Feature], feats: Array[Feature], offset: Int): Array[Int] = {
-    val indexedArr = new Array[Int](feats.size);
-    var i = 0;
-    while (i < feats.size) {
-      indexedArr(i) = index(feats(i)) + offset;
-      i += 1;
-    }
-    indexedArr;
-  }
-  
+  def indexAndOffset(index: Index[Feature], feats: Array[Feature], offset: Int): Array[Int] =
+    Array.fillWith[Int](feats.length)(i => index(feats(i)) + offset)
+
   def addToIndex(index: MutableIndex[Feature], feats: Array[Feature]) {
-    var i = 0;
-    while (i < feats.size) {
-      index.index(feats(i));
-      i += 1;
+    var i = 0
+    while (i < feats.length) {
+      index.index(feats(i))
+      i += 1
     }
   }
   

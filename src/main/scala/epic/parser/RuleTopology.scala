@@ -44,12 +44,11 @@ final class RuleTopology[L] private (
 
   val rootIndex = labelIndex(root)
 
-
   def labelEncoder  = Encoder.fromIndex(labelIndex)
 
   // Accessors for properties of indexed rules
   /** Returns the parent label index from the rule index */
-  def parent(r: Int):Int = indexedRules(r).parent
+  def parent(r: Int): Int = indexedRules(r).parent
   /** Returns the left child label index from the rule index */
   def leftChild(r: Int): Int = indexedRules(r).asInstanceOf[BinaryRule[Int]].left
   /** Returns the right child label index from the rule index */
@@ -85,7 +84,7 @@ final class RuleTopology[L] private (
     for( (parent,block) <- blocks) {
       var first = true
       for (r <- block) {
-        if(!first)
+        if (!first)
           builder ++= (" "*startLength)
         else
           builder ++= labelStrings(parent).padTo(startLength, ' ')
@@ -94,7 +93,7 @@ final class RuleTopology[L] private (
 
         r match {
           case UnaryRule(a, b, chain) =>
-            if(chain.nonEmpty)
+            if (chain.nonEmpty)
               chain.addString(builder, "(", "^", ")^")
             builder ++= labelStrings(b)
           case BinaryRule(a, b, c) =>
@@ -120,10 +119,10 @@ final class RuleTopology[L] private (
 object RuleTopology {
   /** Builds a grammar just from some productions */
   def apply[L, W](root: L, productions: TraversableOnce[Rule[L]]): RuleTopology[L] = {
-    val index = Index[L]();
+    val index = Index[L]()
     val ruleIndex = Index[Rule[L]]()
     for(r <- productions) {
-      index.index(r.parent);
+      index.index(r.parent)
       r.children.foreach(index.index(_))
       ruleIndex.index(r)
     }
@@ -186,8 +185,6 @@ object RuleTopology {
       binaryRulesByRightChild.map(_.toArray),
       unaryRulesByChild.map(_.toArray))
   }
-
-
 
   @SerialVersionUID(1)
   private class SerializedForm[L](var root: L, var labelIndex: Index[L], var ri: Index[Rule[L]]) extends Serializable {

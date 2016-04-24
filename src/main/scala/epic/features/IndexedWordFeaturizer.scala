@@ -20,14 +20,13 @@ object IndexedWordFeaturizer {
                   data: IndexedSeq[IndexedSeq[W]],
                   wordHashFeatures: Int = 0,
                   deduplicateFeatures: Boolean = true): IndexedWordFeaturizer[W]  = {
-    val wordIndex = if(deduplicateFeatures) new NonRedundantIndexBuilder[Feature] else new NormalIndexBuilder[Feature]()
+    val wordIndex = if (deduplicateFeatures) new NonRedundantIndexBuilder[Feature] else new NormalIndexBuilder[Feature]()
     for(words <- data) {
       val anch = feat.anchor(words)
-      for(i <- 0 until words.length) {
+      words.indices.foreach { i =>
         wordIndex.add(anch.featuresForWord(i) )
       }
     }
-
 
     new MyWordFeaturizer[W](feat, wordIndex.result())
   }
@@ -47,9 +46,9 @@ object IndexedWordFeaturizer {
     val result = mutable.ArrayBuilder.make[Int]()
     result.sizeHint(features)
     var i = 0
-    while(i < features.length) {
+    while (i < features.length) {
       val fi = ind(features(i))
-      if(fi >= 0)
+      if (fi >= 0)
         result += fi
       i += 1
     }
@@ -58,7 +57,6 @@ object IndexedWordFeaturizer {
     r
   }
 }
-
 
 @SerialVersionUID(1L)
 class TabulatedIndexedWordAnchoring[W](val words: IndexedSeq[W],

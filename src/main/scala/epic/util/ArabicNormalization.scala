@@ -13,7 +13,7 @@ import scala.annotation.switch
 object ArabicNormalization extends LazyLogging {
 
   def handleTreebankThings(s: String):Option[String] = {
-    if(!s.startsWith("-")) {
+    if (!s.startsWith("-")) {
       None
     } else {
       s match {
@@ -27,11 +27,10 @@ object ArabicNormalization extends LazyLogging {
         case "-MINUS-" => Some(s)
         case _ => None
       }
-
     }
   }
 
-  def buckwalterToUnicode(buckwalter: String):String = {
+  def buckwalterToUnicode(buckwalter: String): String = {
     handleTreebankThings(buckwalter) match {
       case Some(x) => x
       case None =>
@@ -89,11 +88,10 @@ object ArabicNormalization extends LazyLogging {
             case '{' => '\u0671'
             case '.' | '?' | '!' | ',' | '"' | '%' | '-' | '/' | ':' | ';' | '=' => buckwalter(i)
             case x =>
-              if(!x.isDigit)
+              if (!x.isDigit)
                 logger.warn("Unknown buckwalter character: " + x)
               x
           }}
-
           i += 1
         }
         out.result()

@@ -18,12 +18,11 @@ case class CachingLookupAndAffineTransformDense[FV](numOutputs: Int,
                                                     word2vecIndexed: Word2VecIndexed[String],
                                                     includeBias: Boolean = true) extends Transform[Array[Int], DenseVector[Double]] {
 
-
   val index = new AffineTransform.Index(numOutputs, numInputs, includeBias)
   
   def extractLayer(weights: DenseVector[Double], forTrain: Boolean) = {
     val mat = weights(0 until (numOutputs * numInputs)).asDenseMatrix.reshape(numOutputs, numInputs, view = View.Require)
-    val bias = if(includeBias) {
+    val bias = if (includeBias) {
       weights(numOutputs * numInputs until index.size)
     } else {
       DenseVector.zeros[Double](numOutputs)
@@ -49,7 +48,7 @@ case class CachingLookupAndAffineTransformDense[FV](numOutputs: Int,
   }
   
   def getInterestingWeightIndicesForGradientCheck(offset: Int): Seq[Int] = {
-    (offset until offset + Math.min(10, index.size))
+    offset until offset + Math.min(10, index.size)
   }
 
   case class Layer(weights: DenseMatrix[Double], bias: DenseVector[Double]) extends Transform.Layer[Array[Int],DenseVector[Double]] {
@@ -66,8 +65,8 @@ case class CachingLookupAndAffineTransformDense[FV](numOutputs: Int,
 
     def activations(fv: Array[Int]) = {
       val finalVector = DenseVector.zeros[Double](numOutputs)
-      for (i <- 0 until fv.size) {
-//        val wordPosn = fv(i) -> i
+      fv.indices.foreach { i =>
+      // val wordPosn = fv(i) -> i
         if (fv(i) != -1) {
           caches(i).synchronized {
             if (!caches(i).contains(fv(i))) {
@@ -84,7 +83,7 @@ case class CachingLookupAndAffineTransformDense[FV](numOutputs: Int,
     def tallyDerivative(deriv: DenseVector[Double], _scale: =>Vector[Double], fv: Array[Int]) = {
       val scale = _scale
       val matDeriv = deriv(0 until (numOutputs * numInputs)).asDenseMatrix.reshape(numOutputs, numInputs, view = View.Require)
-      val biasDeriv = if(includeBias) {
+      val biasDeriv = if (includeBias) {
         deriv(numOutputs * numInputs until index.size)
       } else {
         DenseVector.zeros[Double](numOutputs)
@@ -92,12 +91,12 @@ case class CachingLookupAndAffineTransformDense[FV](numOutputs: Int,
 
       // whole function is f(mat * inner(fv) + bias)
       // scale(i) pushes in  (f'(mat * inner(v) + bias))(i)
-      val innerAct = DenseVector(word2vecIndexed.convertToVector(fv));
+      val innerAct = DenseVector(word2vecIndexed.convertToVector(fv))
       
       // d/d(weights(::, i)) == scale(i) * innerAct
       for (i <- 0 until weights.rows) {
         val a: Double = scale(i)
-        if(a != 0.0) {
+        if (a != 0.0) {
           axpy(a, innerAct, matDeriv.t(::, i))
         // so d/dbias(i) = scale(i)
           biasDeriv(i) += a

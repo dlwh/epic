@@ -29,14 +29,14 @@ case class LabeledSpanProjector[L, W](topology: RuleTopology[L], threshold: Doub
 
   type MyAnchoring = SpanAnchoring[L, W]
   private def normalize(ruleScores: OpenAddressHashArray[Double], totals: OpenAddressHashArray[Double]):OpenAddressHashArray[Double] = {
-    if(ruleScores eq null) null
+    if (ruleScores eq null) null
     else {
       val r = new OpenAddressHashArray[Double](ruleScores.length, Double.NegativeInfinity)
       for( (rule, score) <- ruleScores.activeIterator) {
         val parent = topology.parent(rule)
-        if(score > 0.9999999) {
+        if (score > 0.9999999) {
           r(rule) = 10
-        } else if(score > 0) {
+        } else if (score > 0) {
           r(rule) = math.log(score) - math.log1p(-score)
         }
       }
@@ -45,13 +45,13 @@ case class LabeledSpanProjector[L, W](topology: RuleTopology[L], threshold: Doub
   }
 
   private def normalizeSpans(totals: OpenAddressHashArray[Double]):OpenAddressHashArray[Double] = {
-    if(totals eq null) null
+    if (totals eq null) null
     else {
       val r = new OpenAddressHashArray[Double](totals.length, Double.NegativeInfinity)
       for( (parent, score) <- totals.activeIterator) {
-        if(score > 0.9999999) {
+        if (score > 0.9999999) {
           r(parent) = 10
-        } else if(score > 0) {
+        } else if (score > 0) {
           r(parent) = math.log(score) - math.log1p(-score)
         }
       }
@@ -97,13 +97,13 @@ case class SpanAnchoring[L, W](topology: RuleTopology[L],
 
   def scoreUnaryRule(begin: Int, end: Int, rule: Int) = {
     val forSpan = unaryScores(TriangularArray.index(begin, end))
-    if(forSpan eq null) Double.NegativeInfinity
+    if (forSpan eq null) Double.NegativeInfinity
     else forSpan(rule)
   }
 
   def scoreSpan(begin: Int, end: Int, tag: Int) = {
     val scores = spanScores(TriangularArray.index(begin, end))
-    if(scores ne null) scores(tag)
+    if (scores ne null) scores(tag)
     else Double.NegativeInfinity
   }
 }

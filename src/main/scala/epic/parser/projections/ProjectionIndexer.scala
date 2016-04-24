@@ -28,7 +28,7 @@ final class ProjectionIndexer[C, F] private (val coarseIndex: Index[C],
     for( (coarse, fine) <- indexedProjections.zipWithIndex if coarse != -1) {
       result(coarse) += fine
     }
-    result.map(arr => (arr.toArray))
+    result.map(arr => arr.toArray)
   }
 
   // globaleRefined -> localRefined
@@ -41,37 +41,37 @@ final class ProjectionIndexer[C, F] private (val coarseIndex: Index[C],
     Array.range(0, arr.length)
   }
 
-  def localize(f: Int):Int =  localizationArray(f)
-  def globalize(c: Int, f: Int):Int = globalRefinements(c)(f)
+  def localize(f: Int): Int =  localizationArray(f)
+  def globalize(c: Int, f: Int): Int = globalRefinements(c)(f)
   def globalize(c: C, f: Int):F = fineIndex.get(globalRefinements(coarseIndex(c))(f))
   def indexAndLocalize(f: F):(Int, Int) = {
     val glob = fineIndex(f)
-    if(glob < 0) (-1, -1)
+    if (glob < 0) (-1, -1)
     else project(glob) -> localize(glob)
   }
 
-
   def localize(f: F):(C, Int) = {
     val i = fineIndex(f)
-    if(i < 0) throw new RuntimeException(s"Not in fine index: $f")
+    if (i < 0) throw new RuntimeException(s"Not in fine index: $f")
     coarseIndex.get(indexedProjections(i)) -> localizationArray(i)
   }
 
   def refinementsOf(c: Int):Array[Int] = globalRefinements(c)
+
   def localRefinements(c: Int):Array[Int] = perSymbolRefinements(c)
 
   def numRefinements(c: Int): Int = perSymbolRefinements(c).length
 
   def refinementsOf(c: C):IndexedSeq[F] = {
     val ci = coarseIndex(c)
-    if(ci < 0) throw new RuntimeException("Not a coarse symbol: " + c)
+    if (ci < 0) throw new RuntimeException("Not a coarse symbol: " + c)
     globalRefinements(ci).map(fineIndex.get _)
   }
 
   /**
    * Computes the projection of the indexed fine label f to an indexed coarse label.
    */
-  def project(f: Int):Int = indexedProjections(f)
+  def project(f: Int): Int = indexedProjections(f)
 
   def project(f: F):C = coarseIndex.get(project(fineIndex(f)))
 
@@ -93,7 +93,6 @@ final class ProjectionIndexer[C, F] private (val coarseIndex: Index[C],
     coarseIndex.map(x => x -> refinementsOf(x)).mkString("ProjectionIndexer(", ", ", ")")
   }
 
-
   def localizeArray[T:ClassTag](array: Array[T]):Array[Array[T]] = {
     require(array.length == fineIndex.size)
     Array.tabulate(coarseIndex.size) { c =>
@@ -110,8 +109,8 @@ object ProjectionIndexer {
     val indexedProjections = Encoder.fromIndex(fineIndex).fillArray(-1)
     for( (l, idx) <- fineIndex.zipWithIndex) {
       val projectedIdx = coarseIndex(proj(l))
-      if(projectedIdx < 0) {
-        if(!skipMissingCoarse)
+      if (projectedIdx < 0) {
+        if (!skipMissingCoarse)
         throw new RuntimeException("error while indexing" + l + " to " + proj(l) + fineIndex(l))
       } else {
         indexedProjections(idx) = projectedIdx
@@ -130,7 +129,6 @@ object ProjectionIndexer {
       }
     }
     new ProjectionIndexer(coarseIndex, fineIndex, indexedProjections)
-
   }
 
   def fromSplitter[C, F](coarseIndex: Index[C], split: C=>Seq[F]) = {
@@ -141,7 +139,6 @@ object ProjectionIndexer {
       indexedProjections += cf
     }
     new ProjectionIndexer(coarseIndex, fineIndex, indexedProjections.toArray)
-
   }
 
 }

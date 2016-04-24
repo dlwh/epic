@@ -4,7 +4,6 @@ import epic.framework.Feature
 import scala.collection.mutable.ArrayBuffer
 import epic.util.Arrays
 
-
 /**
  *
  * @author dlwh
@@ -19,7 +18,6 @@ class ContextWordFeaturizer[W](offsetFeaturizer: WordFeaturizer[W], wordOffsetOr
       for(off <- -wordOffsetOrder to wordOffsetOrder if off != 0) {
         result ++= offsetAnchoring.featuresForWord(pos + off).map(f => OffsetFeature(off, f):Feature)
       }
-
       /*
       val myFeats = offsetAnchoring.featuresForWord(pos)
       result ++= Arrays.crossProduct(Array(myFeats.head), offsetAnchoring.featuresForWord(pos+1)){BigramFeature(0, _, _)}
@@ -29,7 +27,6 @@ class ContextWordFeaturizer[W](offsetFeaturizer: WordFeaturizer[W], wordOffsetOr
     }
 
     def words: IndexedSeq[W] = w
-
 
   }
 

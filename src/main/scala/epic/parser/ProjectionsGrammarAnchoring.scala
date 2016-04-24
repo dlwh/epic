@@ -12,7 +12,6 @@ trait ProjectionsGrammarAnchoring[L, L2, W] extends GrammarAnchoring[L, W] {
   def refinements: GrammarRefinements[L, L2]
   def refinedTopology: RuleTopology[L2]
 
-
   final def validLabelRefinements(begin: Int, end: Int, label: Int) = {
     refinements.labels.localRefinements(label)
   }
@@ -60,7 +59,7 @@ trait ProjectionsGrammarAnchoring[L, L2, W] extends GrammarAnchoring[L, W] {
     val b2 = refinements.labels.globalize(b, refB)
     val rule = UnaryRule(refinements.labels.fineIndex.get(a2), refinements.labels.fineIndex.get(b2), topology.chain(r))
     val refinedRuleIndex = refinements.rules.fineIndex(rule)
-    if(refinedRuleIndex < 0) {
+    if (refinedRuleIndex < 0) {
       -1
     } else {
       refinements.rules.localize(refinedRuleIndex)
@@ -79,7 +78,7 @@ trait ProjectionsGrammarAnchoring[L, L2, W] extends GrammarAnchoring[L, W] {
       refinements.labels.fineIndex.get(c2)
     )
     val fi = refinements.rules.fineIndex(rule)
-    if(fi < 0) throw new RuntimeException(s"No such rule: $rule")
+    if (fi < 0) throw new RuntimeException(s"No such rule: $rule")
     refinements.rules.localize(fi)
   }
 
@@ -99,7 +98,5 @@ trait ProjectionsGrammarAnchoring[L, L2, W] extends GrammarAnchoring[L, W] {
   final def validRightChildRefinementsGivenRule(completionBegin: Int, completionEnd: Int, begin: Int, end: Int, rule: Int): Array[Int] = {
     refinements.rightChildRefinementsCompatibleWithRule(rule)
   }
-
-
 
 }

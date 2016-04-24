@@ -18,7 +18,6 @@ package epic.lexicon
 import math.log
 import breeze.linalg._
 
-
 /**
  * @param counts
  * @tparam L
@@ -26,9 +25,7 @@ import breeze.linalg._
 class SignatureTagScorer[L, String](counts: Counter2[L, String, Double], signature: String=>String) extends TagScorer[L, String] {
   def anchor(w: IndexedSeq[String]):Anchoring = new Anchoring {
     def words: IndexedSeq[String] = w
-
-    val sigs = w.map(x => if(counts(::, x).valuesIterator.nonEmpty) x else signature(x))
-
+    val sigs = w.map(x => if (counts(::, x).valuesIterator.nonEmpty) x else signature(x))
     def scoreTag(pos: Int, l: L) = {
       counts(l, sigs(pos))
     }
