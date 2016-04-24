@@ -32,7 +32,7 @@ class ReplGrammar(treebankPath: String, binarizationKind: String = "xbar") {
       case "head" => HeadFinder.collins
       case _ => HeadFinder.collins
     }
-    Trees.binarize((_:Tree[String]), headRules)
+    Trees.binarize(_:Tree[String], headRules)
   }
 
   val maxLength = 15

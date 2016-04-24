@@ -52,7 +52,7 @@ class PennTreeReader(reader: Reader,
 
   private var nextTree = readRootTree()
 
-  def hasNext = (nextTree != null)
+  def hasNext = nextTree != null
 
   def next() = {
     if (!hasNext) throw new NoSuchElementException()
@@ -151,7 +151,7 @@ class PennTreeReader(reader: Reader,
       numRead += 1
       ch = in.read()
     }
-    val yes = numRead > 0 && (isRightParen(ch))
+    val yes = numRead > 0 && isRightParen(ch)
     in.unread(ch)
     for (i <- 0 until numRead) {
       in.unread('(')
@@ -196,7 +196,7 @@ class PennTreeReader(reader: Reader,
   }
 
   private def isWhiteSpace(ch : Int) = {
-    (ch == ' ' || ch == '\t' || ch == '\f' || ch == '\r' || ch == '\n')
+    ch == ' ' || ch == '\t' || ch == '\f' || ch == '\r' || ch == '\n'
   }
 
   private def isLeftParen(ch : Int) = {

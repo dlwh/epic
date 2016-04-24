@@ -24,10 +24,10 @@ object DependencyTree {
     val deps = new Array[(L, Int)](words.length)
     for( subtree <- annotated.allChildren) {
       for(t <- subtree.children if t.label._2 != subtree.label._2) {
-        deps(t.label._2) = (t.label._1 -> subtree.label._2)
+        deps(t.label._2) = t.label._1 -> subtree.label._2
       }
     }
-    deps(annotated.label._2) = (annotated.label._1 -> words.length)
+    deps(annotated.label._2) = annotated.label._1 -> words.length
     DependencyTree(deps, words)
   }
 }

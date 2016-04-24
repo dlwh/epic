@@ -28,7 +28,7 @@ final class ProjectionIndexer[C, F] private (val coarseIndex: Index[C],
     for( (coarse, fine) <- indexedProjections.zipWithIndex if coarse != -1) {
       result(coarse) += fine
     }
-    result.map(arr => (arr.toArray))
+    result.map(arr => arr.toArray)
   }
 
   // globaleRefined -> localRefined

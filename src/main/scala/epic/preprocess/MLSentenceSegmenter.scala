@@ -288,7 +288,7 @@ object MLSentenceSegmenter {
 
 
   def isProbablyNotContraction(text: String, offset: Int, codepoint: Int, quote: Char): Boolean = {
-    (codepoint != quote || offset >= text.length - 1 || offset == 0 || !Character.isLetterOrDigit(text.codePointAt(offset + 1)) || !Character.isLetterOrDigit(text.codePointBefore(offset)))
+    codepoint != quote || offset >= text.length - 1 || offset == 0 || !Character.isLetterOrDigit(text.codePointAt(offset + 1)) || !Character.isLetterOrDigit(text.codePointBefore(offset))
   }
 
   def potentialSentenceBoundariesIterator(text: String):Iterator[Int] = new Iterator[Int] {
@@ -455,7 +455,7 @@ object MLSentenceSegmenter {
 
     val inf = model.inferenceFromWeights(bestWeights)
 
-    val decoded = (Encoder.fromIndex(featureIndex).decode(bestWeights))
+    val decoded = Encoder.fromIndex(featureIndex).decode(bestWeights)
 
     println("Train")
     evalDev(inf, train, decoded)
@@ -476,8 +476,8 @@ object MLSentenceSegmenter {
     var tN, fN = 0
     var tP, fP = 0
     for(inst <- dev) {
-      if(inst.label != inf.classify(inst.features)) {
-        val weights = (inst.features.toIndexedSeq.map( f => f -> decoded(f)))
+      if (inst.label != inf.classify(inst.features)) {
+        val weights = inst.features.toIndexedSeq.map(f => f -> decoded(f))
         val sum: Double = weights.map(_._2).sum
         println("===========")
         println(inst.label, inst.id, sum)

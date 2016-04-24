@@ -54,7 +54,7 @@ case class ProductParserModelFactory(annotator: TreeAnnotator[AnnotatedLabel, St
   }
 
   def split(x: AnnotatedLabel, counts: Map[AnnotatedLabel, Int]):Seq[(AnnotatedLabel, Seq[Int])] = {
-    for (split <- genSplits(numModels, counts.getOrElse(x, numStates))) yield (x -> split)
+    for (split <- genSplits(numModels, counts.getOrElse(x, numStates))) yield x -> split
   }
 
   def unsplit(x: (AnnotatedLabel, Seq[Int])) = x._1

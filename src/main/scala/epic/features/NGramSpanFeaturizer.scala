@@ -24,7 +24,7 @@ class NGramSpanFeaturizer(wordCounts: Counter[String,Double],
   private val wordIndex = Index(wordCounts.keysIterator)
   private val bigramIndex = Index(bigramCounts.keysIterator)
   private val higherOrderIndices = (3 to maxOrder).map(n => Index(higherOrderCounts(n-3).keysIterator))
-  println(wordIndex.size + " unigrams, " + bigramIndex.size + " bigrams, " + (higherOrderIndices.map(_.size)) + " higher-order n-grams")
+  println(wordIndex.size + " unigrams, " + bigramIndex.size + " bigrams, " + higherOrderIndices.map(_.size) + " higher-order n-grams")
   
   def anchor(words: IndexedSeq[String]): SurfaceFeatureAnchoring[String] = {
     new SurfaceFeatureAnchoring[String] {

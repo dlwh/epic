@@ -105,7 +105,7 @@ object Tree {
     import tree._
     sb append "( " append tree.label append " [" append span.begin append "," append span.end append "] "
     for( c <- tree.children ) {
-      if(newline && (c.children.nonEmpty)) sb append "\n" append "  " * depth
+      if(newline && c.children.nonEmpty) sb append "\n" append "  " * depth
       else sb.append(' ')
       recursiveToString(c,depth+1,newline, sb)
     }
@@ -362,14 +362,14 @@ object Trees {
       tree match {
         //invariant: history is the (depth) non-intermediate symbols, where we remove unary-identity transitions
         case BinaryTree(label, t1, t2, span) =>
-          val newHistory = if(!isIntermediate(label)) (label :: history) else history
+          val newHistory = if(!isIntermediate(label)) label :: history else history
           val lchild = rec(t1,newHistory)
           val rchild = rec(t2,newHistory)
           BinaryTree(newLabel, lchild, rchild, span)
         case u@UnaryTree(label, child, chain, span) =>
           if(isIntermediate(label)) assert(history.nonEmpty, ot.toString(true) + "\n" + u.toString(true) )
           //if(isIntermediate(label)) assert(label != newLabel, label + " " + newLabel + " " + u + " " + history)
-          val newHistory = if(!isIntermediate(label) && label != child.label) (label :: history) else history
+          val newHistory = if(!isIntermediate(label) && label != child.label) label :: history else history
           UnaryTree(newLabel,rec(child,newHistory), chain, span)
         case NullaryTree(label, span) =>
           NullaryTree(newLabel, span)

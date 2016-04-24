@@ -260,11 +260,11 @@ object SentimentTreebankPipeline extends LazyLogging {
         spansRightBinary += (if (SentimentEvaluator.isUsedBinaryCoarse(gLabel, pLabel) && SentimentEvaluator.isCorrectBinary(gLabel, pLabel)) 1 else 0)
         numBinarySpans += (if (SentimentEvaluator.isUsedBinaryCoarse(gLabel, pLabel)) 1 else 0)
       }
-      val rootsRight = (if (SentimentEvaluator.isCorrectNormal(goldRoot, guessRoot)) 1 else 0)
+      val rootsRight = if (SentimentEvaluator.isCorrectNormal(goldRoot, guessRoot)) 1 else 0
       val numRoots = 1
       val rootsRightTernary = if (SentimentEvaluator.isCorrectTernary(goldRoot, guessRoot)) 1 else 0
-      val rootsRightBinary = (if (SentimentEvaluator.isUsedBinaryCoarse(goldRoot, guessRoot) && SentimentEvaluator.isCorrectBinary(goldRoot, guessRoot)) 1 else 0)
-      val numBinaryRoots = (if (SentimentEvaluator.isUsedBinaryCoarse(goldRoot, guessRoot)) 1 else 0)
+      val rootsRightBinary = if (SentimentEvaluator.isUsedBinaryCoarse(goldRoot, guessRoot) && SentimentEvaluator.isCorrectBinary(goldRoot, guessRoot)) 1 else 0
+      val numBinaryRoots = if (SentimentEvaluator.isUsedBinaryCoarse(goldRoot, guessRoot)) 1 else 0
       Stats(spansRight, numSpans, spansRightTernary, spansRightBinary, numBinarySpans,
                   rootsRight, numRoots, rootsRightTernary, rootsRightBinary, numBinaryRoots)
     }.reduce(_+_)
@@ -279,19 +279,19 @@ object SentimentTreebankPipeline extends LazyLogging {
         // Elsewhere, use the top chart
         topMarg(t.begin, t.end)
       }
-      if(decodeType == Binary) {
-        val neg = (summed(AnnotatedLabel("0")) + summed(AnnotatedLabel("1")) )
-        val pos = (summed(AnnotatedLabel("3")) + summed(AnnotatedLabel("4")) )
-        if(neg > pos) {
+      if (decodeType == Binary) {
+        val neg = summed(AnnotatedLabel("0")) + summed(AnnotatedLabel("1"))
+        val pos = summed(AnnotatedLabel("3")) + summed(AnnotatedLabel("4"))
+        if (neg > pos) {
           AnnotatedLabel("0")
         } else  {
           AnnotatedLabel("4")
         }
-      } else if(decodeType == Ternary) {
-        val neg = (summed(AnnotatedLabel("0")) + summed(AnnotatedLabel("1")) )
-        val pos = (summed(AnnotatedLabel("3")) + summed(AnnotatedLabel("4")) )
-        val neutral = (summed(AnnotatedLabel("2")))
-        
+      } else if (decodeType == Ternary) {
+        val neg = summed(AnnotatedLabel("0")) + summed(AnnotatedLabel("1"))
+        val pos = summed(AnnotatedLabel("3")) + summed(AnnotatedLabel("4"))
+        val neutral = summed(AnnotatedLabel("2"))
+
         if(neg > pos && neg > neutral) {
           AnnotatedLabel("0")
         } else if (pos > neg && pos > neutral) {

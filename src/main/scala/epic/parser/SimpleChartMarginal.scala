@@ -26,7 +26,7 @@ final case class SimpleChartMarginal[L, L2, W](anchoring: SimpleGrammar.Anchorin
   }
 
   override def feasibleSplitPoints(begin: Int, end: Int, leftChild: Int, leftChildRef: Int, rightChild: Int, rightChildRef: Int): IndexedSeq[Int] = {
-    (begin + 1) until (end)
+    (begin + 1) until end
   }
 
   override def visitPostorder(spanVisitor: AnchoredVisitor[L], spanThreshold: Double): Unit = {
@@ -246,7 +246,7 @@ object SimpleChartMarginal  {
     val numSyms = tensor.numLeftChildren
 
     for {
-      span <- (length) until 0 by (-1)
+      span <- length until 0 by (-1)
       begin <- 0 to (length-span)
     } {
       val end = begin + span

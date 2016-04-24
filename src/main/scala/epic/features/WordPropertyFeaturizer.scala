@@ -50,7 +50,7 @@ class WordPropertyFeaturizer(wordCounts: Counter[String, Double],
       val base = myFeatures(pos)
         // initial words nee special treatment
         if( (words(pos).charAt(0).isUpper || words(pos).charAt(0).isTitleCase) && base.length > 1) {
-          val isInitialWord = (pos == 0 || words(pos -1) == "``")
+          val isInitialWord = pos == 0 || words(pos -1) == "``"
           if(isInitialWord) {
             base ++ base.map(FirstWordCapsAnd)
           } else {
@@ -89,7 +89,7 @@ class WordPropertyFeaturizer(wordCounts: Counter[String, Double],
         features += isAnInitialFeature
       }
 
-      if(w.length > 1 && w.last == ('.')) {
+      if(w.length > 1 && w.last == '.') {
         features += endsWithPeriodFeature
 
       }

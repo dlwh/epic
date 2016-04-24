@@ -135,7 +135,7 @@ class ZeroFeaturizer[W] extends WordFeaturizer[W] with SurfaceFeaturizer[W] with
 
 
 
-class NextActualWordFeaturizer(f: WordFeaturizer[String], lookRight: Boolean, isPunct: (String=>Boolean) = (_.forall(!_.isLetterOrDigit))) extends WordFeaturizer[String] with Serializable {
+class NextActualWordFeaturizer(f: WordFeaturizer[String], lookRight: Boolean, isPunct: (String=>Boolean) = _.forall(!_.isLetterOrDigit)) extends WordFeaturizer[String] with Serializable {
   val dir = if(lookRight) 'Right else 'Left
   def anchor(words: IndexedSeq[String]): WordFeatureAnchoring[String] = {
     val w = words

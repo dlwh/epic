@@ -53,7 +53,7 @@ class ParseEval[L](ignoredLabels: Set[L]) {
   def apply(guess: Tree[L], gold: Tree[L]): Statistics = {
     val guessSet = labeledConstituents(guess)
     val goldSet = labeledConstituents(gold)
-    val inter = (guessSet intersect goldSet)
+    val inter = guessSet intersect goldSet
     val exact = if(goldSet.size == inter.size && guessSet.size == inter.size) 1 else 0
     val guessLeaves = guess.leaves
     val goldLeaves = gold.leaves
@@ -84,9 +84,9 @@ object ParseEval extends LazyLogging {
         numParses + stats.numParses)
     }
 
-    def precision = if(guess == 0) 1.0 else (right * 1.0 / guess)
-    def recall = if(guess == 0) 1.0 else (right * 1.0 / gold)
-    def exact = (numExact * 1.0 / numParses)
+    def precision = if(guess == 0) 1.0 else right * 1.0 / guess
+    def recall = if(guess == 0) 1.0 else right * 1.0 / gold
+    def exact = numExact * 1.0 / numParses
     def tagAccuracy = tagsRight * 1.0 / numWords
     def f1 = (2 * precision * recall)/(precision + recall)
 

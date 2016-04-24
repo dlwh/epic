@@ -35,7 +35,7 @@ class NewLineSentenceSegmenter(locale: Locale = Locale.getDefault) extends Sente
 class SegmentingIterator(inner: BreakIterator, private var start: Int = 0, private val last: Int = -1) extends Iterator[Span] {
   private var end = inner.following(start)
 
-  def hasNext = (end != BreakIterator.DONE && (last == -1 || end <= last))
+  def hasNext = end != BreakIterator.DONE && (last == -1 || end <= last)
 
   def next = {
     val res = Span(start, end)

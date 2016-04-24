@@ -282,13 +282,13 @@ object PrecacheConstraints extends LazyLogging {
    **/
    def forTreebank(constrainer: ParserChartConstraintsFactory[AnnotatedLabel, String], treebank: ProcessedTreebank, tableName: String = "parseConstraints", verifyNoGoldPruningInTrain: Boolean = true)(implicit broker: CacheBroker) = {
     val cached = forTrainingSet(constrainer, treebank.trainTrees.par.map(ti => ti.copy(tree = ti.tree.map(_.baseAnnotatedLabel))), tableName, verifyNoGoldPruning = verifyNoGoldPruningInTrain)
-    (treebank.devTrees).par.foreach { ti =>
+    treebank.devTrees.par.foreach { ti =>
       logger.info(s"Ensuring existing constraint for dev tree ${ti.id} ${ti.words}")
       val constraints = cached.constraints(ti.words)
       if(verifyNoGoldPruningInTrain)
         checkConstraints(ti.copy(tree = ti.tree.map(_.baseAnnotatedLabel)), constraints, constrainer)
     }
-    (treebank.testTrees).par.foreach { ti =>
+    treebank.testTrees.par.foreach { ti =>
       logger.info(s"Ensuring existing constraint for test sentence ${ti.id} ${ti.words}")
        cached.constraints(ti.words)
     }
