@@ -64,7 +64,7 @@ object PorterStemmer extends PorterStemmer {
     def extra(w: String) = {
       if (w.endsWith("at") || w.endsWith("bl") || w.endsWith("iz")) w + 'e'
       // double consonant:
-      else if (doublec(w) && !("lsz".contains(w.last))) w.substring(0, w.length - 1);
+      else if (doublec(w) && !("lsz".contains(w.last))) w.substring(0, w.length - 1)
       else if (m(w) == 1 && cvc(w)) w + "e"
       else w
     }

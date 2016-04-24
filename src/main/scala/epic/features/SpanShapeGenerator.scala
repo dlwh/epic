@@ -66,7 +66,7 @@ object SpanShapeGenerator extends Serializable {
       }
       result += '['
     }
-    var i = begin;
+    var i = begin
     while (i < math.min(begin + MAX_LEN/2 + 1, end)) {
       appendWordShape(i, words, result)
       i += 1
@@ -82,9 +82,9 @@ object SpanShapeGenerator extends Serializable {
       i += 1
     }
     if (includeContext) {
-      result += ']';
+      result += ']'
       if (end >= words.length) {
-        result += '#';
+        result += '#'
       } else {
         result += binCharacter(words(end).head)
       }
@@ -95,7 +95,7 @@ object SpanShapeGenerator extends Serializable {
   // Similar, but has the capability to use more and richer context
   def signatureAndContextFor(words: IndexedSeq[String], begin: Int, end: Int, numContextWords: Int = 1, richContext: Boolean = false, commonWords: Set[String] = Set.empty) = {
     val result = new StringBuilder(end-begin)
-    var i = begin - numContextWords;
+    var i = begin - numContextWords
     while (i < begin) {
       if (i < 0) {
         result += '#'
@@ -108,7 +108,7 @@ object SpanShapeGenerator extends Serializable {
           result += binCharacter(words(i).head)
         }
       }
-      i += 1;
+      i += 1
     }
     result += '['
     while (i < math.min(begin + MAX_LEN/2 + 1, end)) {
@@ -125,10 +125,10 @@ object SpanShapeGenerator extends Serializable {
       appendWordShape(i, words, result)
       i += 1
     }
-    result += ']';
+    result += ']'
     while (i < end + numContextWords) {
       if (i >= words.length) {
-        result += '#';
+        result += '#'
       } else {
         if(commonWords(words(i))) {
           result ++= words(i)
@@ -138,7 +138,7 @@ object SpanShapeGenerator extends Serializable {
           result += binCharacter(words(i).head)
         }
       }
-      i += 1;
+      i += 1
     }
     result.toString
   }
@@ -183,7 +183,7 @@ object SpanShapeGenerator extends Serializable {
   // Similar, but has the capability to use more and richer context
   def splitShapeFor(words: IndexedSeq[String], begin: Int, split : Int , end: Int, numContextWords: Int = 1, richContext: Boolean = false, commonWords: Set[String] = Set.empty) = {
     val result = new StringBuilder(end-begin)
-    var i = begin - numContextWords;
+    var i = begin - numContextWords
     while (i < begin) {
       if (i < 0) {
         result += '#'
@@ -196,7 +196,7 @@ object SpanShapeGenerator extends Serializable {
           result += binCharacter(words(i).head)
         }
       }
-      i += 1;
+      i += 1
     }
     result += '['
     while (i < math.min(begin + MAX_LEN/2 + 1, end)) {
@@ -223,10 +223,10 @@ object SpanShapeGenerator extends Serializable {
       appendWordShape(i, words, result)
       i += 1
     }
-    result += ']';
+    result += ']'
     while (i < end + numContextWords) {
       if (i >= words.length) {
-        result += '#';
+        result += '#'
       } else {
         if(commonWords(words(i))) {
           result ++= words(i)
@@ -236,7 +236,7 @@ object SpanShapeGenerator extends Serializable {
           result += binCharacter(words(i).head)
         }
       }
-      i += 1;
+      i += 1
     }
     result.toString
   }

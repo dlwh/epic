@@ -16,8 +16,8 @@ case class LowRankQuadraticTransform[FV](numOutputs: Int, numRanks: Int, numLeft
   val index = SegmentedIndex(neuronIndex, innerTransform.index)
 
   def extractLayerAndPenultimateLayer(weights: DenseVector[Double], forTrain: Boolean) = {
-    val innerLayer = innerTransform.extractLayer(weights(index.componentOffset(1) to -1), forTrain);
     val subTransforms = neurons.indices.map(i => neurons(i).extractLayer(weights(neuronIndex.componentOffset(i) until neuronIndex.componentOffset(i) + neuronIndex.indices(i).size)))
+    val innerLayer = innerTransform.extractLayer(weights(index.componentOffset(1) to -1), forTrain)
     new OutputLayer(subTransforms, innerLayer) -> innerLayer
   }
   
@@ -32,7 +32,7 @@ case class LowRankQuadraticTransform[FV](numOutputs: Int, numRanks: Int, numLeft
   }
   
   def clipHiddenWeightVectors(weights: DenseVector[Double], norm: Double, outputLayer: Boolean) {
-    innerTransform.clipHiddenWeightVectors(weights(index.componentOffset(1) to -1), norm, outputLayer);
+    innerTransform.clipHiddenWeightVectors(weights(index.componentOffset(1) to -1), norm, outputLayer)
   }
   
   def getInterestingWeightIndicesForGradientCheck(offset: Int): Seq[Int] = {

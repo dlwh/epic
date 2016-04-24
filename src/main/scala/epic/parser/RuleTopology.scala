@@ -120,10 +120,10 @@ final class RuleTopology[L] private (
 object RuleTopology {
   /** Builds a grammar just from some productions */
   def apply[L, W](root: L, productions: TraversableOnce[Rule[L]]): RuleTopology[L] = {
-    val index = Index[L]();
+    val index = Index[L]()
     val ruleIndex = Index[Rule[L]]()
     for(r <- productions) {
-      index.index(r.parent);
+      index.index(r.parent)
       r.children.foreach(index.index(_))
       ruleIndex.index(r)
     }

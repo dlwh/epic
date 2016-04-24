@@ -100,7 +100,7 @@ case class ProcessedTreebank(@Help(text="Location of the treebank directory")
       case "xbar" | "right" => HeadFinder.right[String]
       case "leftXbar" | "left" => HeadFinder.left[String]
       case "head" => if (treebankType .startsWith("spmrl")) {
-        SupervisedHeadFinder.trainHeadFinderFromFiles(supervisedHeadFinderPtbPath, supervisedHeadFinderConllPath);
+        SupervisedHeadFinder.trainHeadFinderFromFiles(supervisedHeadFinderPtbPath, supervisedHeadFinderConllPath)
       } else {
         HeadFinder.collins
       }

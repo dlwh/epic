@@ -58,8 +58,8 @@ class PositionalNeuralModel[L, L2, W](annotator: (BinarizedTree[L], IndexedSeq[W
     require(decoupledTransforms.size == 0)
     // Note that duping the transforms is okay because they still produce distinct
     // layers, so caching behavior is unaffected
-    val newTransforms = transforms ++ transforms;
-    val newDepTransforms = depTransforms ++ depTransforms;
+    val newTransforms = transforms ++ transforms
+    val newDepTransforms = depTransforms ++ depTransforms
     new PositionalNeuralModel(annotator, constrainer, topology, lexicon, refinedTopology, refinements, labelFeaturizer, surfaceFeaturizer, depFeaturizer,
                                  newTransforms, maybeSparseSurfaceFeaturizer, newDepTransforms, decoupledTransforms)
   }
@@ -94,9 +94,9 @@ class PositionalNeuralModel[L, L2, W](annotator: (BinarizedTree[L], IndexedSeq[W
   
   def initialWeightVector(initWeightsScale: Double, initializerSpec: String, trulyRandom: Boolean = false): DenseVector[Double] = {
     val rng = if (trulyRandom) new Random() else new Random(0)
-    val initTransformWeights = DenseVector.vertcat(transforms.map(_.initialWeightVector(initWeightsScale, rng, true, initializerSpec)):_*);
-    val initDepWeights = DenseVector.vertcat(depTransforms.map(_.initialWeightVector(initWeightsScale, rng, true, initializerSpec)):_*);
-    val initDecoupledWeights = DenseVector.vertcat(decoupledTransforms.map(_.initialWeightVector(initWeightsScale, rng, true, initializerSpec)):_*);
+    val initTransformWeights = DenseVector.vertcat(transforms.map(_.initialWeightVector(initWeightsScale, rng, true, initializerSpec)):_*)
+    val initDepWeights = DenseVector.vertcat(depTransforms.map(_.initialWeightVector(initWeightsScale, rng, true, initializerSpec)):_*)
+    val initDecoupledWeights = DenseVector.vertcat(decoupledTransforms.map(_.initialWeightVector(initWeightsScale, rng, true, initializerSpec)):_*)
     val newInitVector: DenseVector[Double] = if (maybeSparseSurfaceFeaturizer.isDefined) {
       DenseVector.vertcat(initTransformWeights, initDepWeights, initDecoupledWeights, DenseVector.zeros(maybeSparseSurfaceFeaturizer.get.index.size))
     } else {
@@ -136,7 +136,7 @@ class PositionalNeuralModel[L, L2, W](annotator: (BinarizedTree[L], IndexedSeq[W
    */
   def extractParser(weights: DenseVector[Double], trainExs: Seq[TreeInstance[L,W]])(implicit deb: Debinarizer[L]) = {
     val inf = inferenceFromWeights(weights).forTesting
-    inf.relativizeToData(trainExs.slice(0, Math.min(trainExs.size, 200)).asInstanceOf[Seq[TreeInstance[AnnotatedLabel,String]]]);
+    inf.relativizeToData(trainExs.slice(0, Math.min(trainExs.size, 200)).asInstanceOf[Seq[TreeInstance[AnnotatedLabel,String]]])
     Parser(constrainer, inf.grammar, ChartDecoder[L, W]())
   }
 
@@ -268,7 +268,7 @@ object PositionalNeuralModel {
         var layerSizeTally = 0
         layers.indices.foreach { j =>
           layers(j).tallyDerivative(deriv(layerSizeTally until layerSizeTally + layers(j).index.size), { ruleCountsPerState(key) * scale }, ffeats)
-          layerSizeTally += layers(j).index.size;
+          layerSizeTally += layers(j).index.size
         }
       }
       if (!decoupledLayers.isEmpty) {
@@ -335,7 +335,7 @@ object PositionalNeuralModel {
       }
       
       def scoreBinaryRule(begin: Int, split: Int, end: Int, rule: Int, ref: Int) = {
-        var total = 0.0;
+        var total = 0.0
         val tetraIdx = tetra(begin, split, end)
         val rfeats = lspec.featuresForBinaryRule(begin, split, end, rule, ref)
         layers.indices.foreach { layerIdx =>
@@ -358,7 +358,7 @@ object PositionalNeuralModel {
       }
       
       def scoreUnaryRule(begin: Int, end: Int, rule: Int, ref: Int) = {
-        var total = 0.0;
+        var total = 0.0
         val tetraIdx = tetra(begin, end, length + 1)
         val rfeats = lspec.featuresForUnaryRule(begin, end, rule, ref)
         layers.indices.foreach { layerIdx =>
@@ -381,7 +381,7 @@ object PositionalNeuralModel {
       }
 
       def scoreSpan(begin: Int, end: Int, tag: Int, ref: Int) = {
-        var total = 0.0;
+        var total = 0.0
         val tetraIdx = tetra(begin, end, length + 2)
         val rfeats = lspec.featuresForSpan(begin, end, tag, ref)
         layers.indices.foreach { layerIdx =>

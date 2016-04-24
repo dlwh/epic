@@ -333,6 +333,6 @@ object PositionalNeuralModelFactory {
   }
 }
 
-case class ParentFeature(f: Feature) extends Feature;
-case class LeftChildFeature(f: Feature) extends Feature;
-case class RightChildFeature(f: Feature) extends Feature;
+case class ParentFeature(f: Feature) extends Feature
+case class LeftChildFeature(f: Feature) extends Feature
+case class RightChildFeature(f: Feature) extends Feature
