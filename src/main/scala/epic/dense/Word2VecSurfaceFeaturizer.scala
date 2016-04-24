@@ -21,7 +21,7 @@ class Word2VecIndexed[W](private val wordIndex: Index[W],
                          private val word2vec: Array[Array[Double]],
                          private val converter: W => W) extends Serializable {
   
-  def wordRepSize = word2vec.head.size
+  def wordRepSize = word2vec.head.length
   def vocSize = wordIndex.size
     
   val zeroVector = Array.tabulate(wordRepSize)(i => 0.0)
@@ -39,7 +39,7 @@ class Word2VecIndexed[W](private val wordIndex: Index[W],
   }
   
   def augment(numSparseFeats: Int, featurizer: W => Array[Int]): Word2VecIndexed[W] = {
-    val newWord2Vec = Array.tabulate(word2vec.size)(i => {
+    val newWord2Vec = Array.tabulate(word2vec.length)(i => {
       val word = wordIndex.get(i)
       val feats = featurizer(word)
       word2vec(i) ++ Array.tabulate(numSparseFeats)(j => if (feats.contains(j)) 1.0 else 0.0)
@@ -71,11 +71,11 @@ class Word2VecSurfaceFeaturizerIndexed[W](val word2vecIndexed: Word2VecIndexed[W
                                           val featureSpec: String) extends Serializable {
   
   def reducedInputSize = {
-    anchor(IndexedSeq[W]()).reducedFeaturesForSpan(0, 0).size * word2vecIndexed.wordRepSize
+    anchor(IndexedSeq[W]()).reducedFeaturesForSpan(0, 0).length * word2vecIndexed.wordRepSize
   }
   
   def splitInputSize = {
-    anchor(IndexedSeq[W]()).featuresForSplit(0, 0, 0).size * word2vecIndexed.wordRepSize
+    anchor(IndexedSeq[W]()).featuresForSplit(0, 0, 0).length * word2vecIndexed.wordRepSize
   }
   
   def anchor(words: IndexedSeq[W]): WordVectorAnchoringIndexed[W] = {
