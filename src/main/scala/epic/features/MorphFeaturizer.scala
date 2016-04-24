@@ -58,7 +58,7 @@ object MorphFeaturizer {
         thisSentFeats += MorphFeat.readMorphFeatsFromBit(splitLine(2)).toArray
       }
     }
-    if (!thisSent.isEmpty) {
+    if (thisSent.nonEmpty) {
       lookupTable.put(thisSent, thisSentFeats)
     }
     println("Loaded " + lookupTable.size + " entries from " + pathToTaggedSentences)

@@ -139,7 +139,7 @@ object SupervisedHeadFinder {
     while (br.ready()) {
       val line = br.readLine()
       if (line.trim.isEmpty) {
-        if (!currSent.isEmpty) {
+        if (currSent.nonEmpty) {
           trees += conllToTree(currSent)
         }
         currSent = new ArrayBuffer[Seq[String]]
@@ -148,7 +148,7 @@ object SupervisedHeadFinder {
       }
       i += 1
     }
-    if (!currSent.isEmpty) {
+    if (currSent.nonEmpty) {
       trees += conllToTree(currSent)
     }
     trees

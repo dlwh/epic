@@ -238,7 +238,7 @@ object PorterStemmer extends PorterStemmer {
       var x: Seq[Char] = w.substring(firstV)
       if (x.isEmpty) m
       else {
-        while (!x.isEmpty) {
+        while (x.nonEmpty) {
           x = x.dropWhile(isVowel)
           if (x.isEmpty) return m
           m += 1

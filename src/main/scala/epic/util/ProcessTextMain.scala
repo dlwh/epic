@@ -66,7 +66,7 @@ trait ProcessTextMain[Model, AnnotatedType] {
       scala.concurrent.ExecutionContext.global
     }
 
-    val iter = if(files.length == 0) Iterator(System.in) else files.iterator.map(new FileInputStream(_))
+    val iter = if (files.isEmpty) Iterator(System.in) else files.iterator.map(new FileInputStream(_))
 
     for(src <- iter) {
       val queue = FIFOWorkQueue(sentenceSegmenter.sentences(src)){sent =>

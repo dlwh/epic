@@ -17,7 +17,7 @@ object TopDownKBestAStar {
     val kbestList = new ArrayBuffer[(BinarizedTree[L], Double)]()
     val queue = new mutable.PriorityQueue[TKAItem[(Int, Int)]]
     queue.enqueue(StartItem)
-    while(!queue.isEmpty && kbestList.size < k) {
+    while(queue.nonEmpty && kbestList.size < k) {
       queue.dequeue() match {
         case StartItem =>
           val begin = 0
