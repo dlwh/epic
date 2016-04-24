@@ -77,7 +77,7 @@ trait Observation[+T] extends Serializable { outer=>
   }
 
   override def toString = {
-    "Observation { ids =" + id + ", features = " + features + "}";
+    "Observation { ids =" + id + ", features = " + features + "}"
   }
 }
 

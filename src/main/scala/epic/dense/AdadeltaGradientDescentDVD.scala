@@ -28,7 +28,7 @@ class AdadeltaGradientDescentDVD(maxIter: Int,
     val newG = (oldState.grad :* oldState.grad) * (1 - rho)
     axpy(rho, oldHistory.squaredGradientsHistory, newG)
     val deltaX = newX - oldState.x
-    val newU = deltaX :* deltaX * (1 - rho);
+    val newU = deltaX :* deltaX * (1 - rho)
     axpy(rho, oldHistory.squaredUpdatesHistory, newU)
     new History(newG, newU)
   }

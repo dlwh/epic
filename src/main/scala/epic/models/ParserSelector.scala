@@ -15,4 +15,4 @@ object ParserSelector extends ModelSelector[Parser[AnnotatedLabel, String], Pars
   def loadParser(language: String = "en"): Option[Parser[AnnotatedLabel, String]] = this.findModel(s"language:$language").map(_.load())
 }
 
-trait ParserModelLoader extends ModelLoader[Parser[AnnotatedLabel,String]];
+trait ParserModelLoader extends ModelLoader[Parser[AnnotatedLabel,String]]

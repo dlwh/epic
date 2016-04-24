@@ -468,7 +468,7 @@ case class FixRootLabelVerticalAnnotation[W]() extends TreeAnnotator[AnnotatedLa
       UnaryTree(label,
        c.relabelRoot(rootLabel => new AnnotatedLabel(rootLabel.label, rootLabel.headTag, (0 until 1).map(i => rootLabel.label), rootLabel.siblings, rootLabel.features)),
        chain,
-       span);
+       span)
     }
   }
 }
@@ -481,20 +481,20 @@ case class TagAnnotation() extends Annotation
 case class MarkPreterminals[W]() extends TreeAnnotator[AnnotatedLabel, W, AnnotatedLabel] {
   def apply(tree: BinarizedTree[AnnotatedLabel], words: Seq[W]) = {
     def rec(tree: BinarizedTree[AnnotatedLabel]):BinarizedTree[AnnotatedLabel] = tree match {
-      case b@BinaryTree(label, lc, rc, span) => BinaryTree(label, rec(lc), rec(rc), span);
-      case n@NullaryTree(label, span) => NullaryTree(label, span);
+      case b@BinaryTree(label, lc, rc, span) => BinaryTree(label, rec(lc), rec(rc), span)
+      case n@NullaryTree(label, span) => NullaryTree(label, span)
       case u@UnaryTree(label, c, chain, span)  => {
         if (c.isLeaf) {
           UnaryTree(new AnnotatedLabel(label.label, label.headTag, label.parents, label.siblings, label.features ++ Set(new PreterminalAnnotation())),
                     c.relabelRoot(cLabel => new AnnotatedLabel(cLabel.label, cLabel.headTag, cLabel.parents, cLabel.siblings, cLabel.features ++ Set(new TagAnnotation()))),
                     chain,
-                    span);
+                    span)
         } else {
-          UnaryTree(label, rec(c), chain, span);
+          UnaryTree(label, rec(c), chain, span)
         }
       }
     }
-    rec(tree);
+    rec(tree)
   }
 }
 

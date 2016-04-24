@@ -63,7 +63,7 @@ case class SentimentLossAugmentation[W](trainTrees: IndexedSeq[TreeInstance[Anno
           if(guessLabel == -1) {
             breeze.numerics.I(goldLabel == guessLabel) * 10000
           } else {
-            losses(goldLabel)(guessLabel) * (if (begin == 0 && end == words.size) rootLossScaling else 1.0);
+            losses(goldLabel)(guessLabel) * (if (begin == 0 && end == words.size) rootLossScaling else 1.0)
           }
         case None =>
            0
@@ -86,6 +86,6 @@ object SentimentLossAugmentation {
       if (guess == 2) 0 else 1
     }
   }
-  def hammingLoss(gold: Int, guess: Int) = if (gold != guess) 1 else 0;
+  def hammingLoss(gold: Int, guess: Int) = if (gold != guess) 1 else 0
   def noLoss(gold: Int, guess: Int) = 0
 }

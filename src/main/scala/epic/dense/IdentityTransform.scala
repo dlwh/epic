@@ -21,7 +21,7 @@ class IdentityTransform[T] extends Transform[T, T] {
     
     val myIndex = Index[Feature]
     
-    def index = myIndex;
+    def index = myIndex
 
     def activations(fv: T) = fv
 

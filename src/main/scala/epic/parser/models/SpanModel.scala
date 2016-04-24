@@ -611,7 +611,7 @@ object SpanModelFactory {
     import dsl._
 
     // class(split + 1)
-    var baseCat: WordFeaturizer[String] = new ZeroFeaturizer[String];
+    var baseCat: WordFeaturizer[String] = new ZeroFeaturizer[String]
     if (useLfsuf) {
       baseCat += lfsuf
     }

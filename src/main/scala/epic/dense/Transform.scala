@@ -20,7 +20,7 @@ trait Transform[In, +Out] extends Serializable  {
 
   def clipHiddenWeightVectors(weights: DenseVector[Double], norm: Double, outputLayer: Boolean)
   
-  def getInterestingWeightIndicesForGradientCheck(offset: Int): Seq[Int];
+  def getInterestingWeightIndicesForGradientCheck(offset: Int): Seq[Int]
   
   type Layer <: Transform.Layer[In,Out]
 }
@@ -29,7 +29,7 @@ object Transform {
   
   trait Layer[In, +Out] {
 
-    def index: Index[Feature];
+    def index: Index[Feature]
 
     def activations(fv: In):Out
 

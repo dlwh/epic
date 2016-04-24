@@ -33,7 +33,7 @@ object HeadFinder {
 
   def right[L]: HeadFinder[L] = new RuleBasedHeadFinder[L](Right, HeadRules.empty)
 
-  val collins = new RuleBasedHeadFinder(Left, rules = HeadRules.collinsHeadRules);
+  val collins = new RuleBasedHeadFinder(Left, rules = HeadRules.collinsHeadRules)
 
   implicit def lensed[L, U](hf: HeadFinder[L])(implicit lens: Lens[U, L]) = hf.projected(lens.get(_: U))
 }
@@ -50,19 +50,19 @@ trait HeadFinder[L] {
 
   def findHeadChild(t: Tree[L]): Int = findHeadChild(t.label, t.children.map(c => c.label): _*)
 
-  def findHeadWord[W](t: Tree[L], words: Seq[W]) = words(findHeadWordIndex(t));
+  def findHeadWord[W](t: Tree[L], words: Seq[W]) = words(findHeadWordIndex(t))
 
   def findHeadWordIndex(t: Tree[L]): Int = {
-    if (t.isLeaf) t.span.begin;
+    if (t.isLeaf) t.span.begin
     else {
-      findHeadWordIndex(t.children(findHeadChild(t)));
+      findHeadWordIndex(t.children(findHeadChild(t)))
     }
   }
 
   def findHeadTag(t: Tree[L]): L = {
     if (t.isLeaf) t.label
     else {
-      findHeadTag(t.children(findHeadChild(t)));
+      findHeadTag(t.children(findHeadChild(t)))
     }
   }
 
@@ -167,8 +167,8 @@ case class HeadRule[L](dir: Dir, dis: Boolean, heads: Seq[L]) { rule =>
       val candidates = for (l <- rule.heads.iterator) yield {
         if (rule.dir == Left) children.indexOf(l)
         else children.lastIndexOf(l)
-      };
-      candidates.find(_ >= 0) getOrElse -1;
+      }
+      candidates.find(_ >= 0) getOrElse -1
     }
 
   }
@@ -210,11 +210,11 @@ object HeadRules {
   /**
    * Search direction for the match.
    */
-  sealed trait Dir;
+  sealed trait Dir
 
-  case object Left extends Dir;
+  case object Left extends Dir
 
-  case object Right extends Dir;
+  case object Right extends Dir
 
   def empty[L]: HeadRules[L] = fromMap[L](Map.empty)
 
@@ -227,7 +227,7 @@ object HeadRules {
 
   }
 
-  private def shr[L](dir: Dir, dis: Boolean, heads: L*) = HeadRule(dir, dis, heads);
+  private def shr[L](dir: Dir, dis: Boolean, heads: L*) = HeadRule(dir, dis, heads)
 
   val collinsHeadRules = fromMap[String] {
     val allNonTerms = shr(Right, false, "ROOT", "TOP", "ADJP", "ADVP", "CONJP", "FRAG", "S", "INTJ", "LST", "NAC", "NX", "PP", "PRN", "PRT", "QP", "RRC", "S", "SBAR", "SBARQ", "SINV", "SQ", "UCP", "VP", "WHADJP", "WHADVP", "WHNP", "WHPP", "X", "NML", "NP", "NN", "NNP", "NNPS", "NNS", "VB", "VBZ", "VBG", "VBD", "JJ", "JJR", "JJS", "CC", "VBP", "PRP", "PRP$", "PRPS", "CD", "IN", "TO", "WDT", "WP", "WP$", "WRB", "RB", "SYM", "RB", "UH", "RP", "RBR", "RBS", "DT")

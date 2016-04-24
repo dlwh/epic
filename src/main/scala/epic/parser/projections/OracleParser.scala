@@ -59,8 +59,8 @@ class OracleParser[L, L2, W](val grammar: SimpleGrammar[L, L2, W], backupGrammar
 
         logger.warn {
           val ratio = synchronized {
-            problems += 1;
-            total += 1;
+            problems += 1
+            total += 1
             problems * 1.0 / total
           }
           f"Gold tree for $words not reachable. $ratio%.2f are bad so far. "

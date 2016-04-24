@@ -30,12 +30,12 @@ case class OutputEmbeddingTransform[FV](numOutputs: Int, outputDim: Int, innerTr
   
   def clipEmbeddingNorms(weights: DenseVector[Double]) {
     val embeddings = weights(index.componentOffset(1) until index.componentOffset(1) + (numOutputs * outputDim)).asDenseMatrix.reshape(numOutputs, outputDim, view = View.Require)
-    OutputEmbeddingTransform.clipEmbeddingNorms(embeddings);
+    OutputEmbeddingTransform.clipEmbeddingNorms(embeddings)
   }
   
   def displayEmbeddingNorms(weights: DenseVector[Double]) {
     val embeddings = weights(index.componentOffset(1) until index.componentOffset(1) + (numOutputs * outputDim)).asDenseMatrix.reshape(numOutputs, outputDim, view = View.Require)
-    OutputEmbeddingTransform.displayEmbeddingNorms(embeddings);
+    OutputEmbeddingTransform.displayEmbeddingNorms(embeddings)
   }
   
   def initialWeightVector(initWeightsScale: Double, rng: Random, outputLayer: Boolean, spec: String) = {

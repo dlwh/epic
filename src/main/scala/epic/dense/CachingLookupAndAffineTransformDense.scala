@@ -92,7 +92,7 @@ case class CachingLookupAndAffineTransformDense[FV](numOutputs: Int,
 
       // whole function is f(mat * inner(fv) + bias)
       // scale(i) pushes in  (f'(mat * inner(v) + bias))(i)
-      val innerAct = DenseVector(word2vecIndexed.convertToVector(fv));
+      val innerAct = DenseVector(word2vecIndexed.convertToVector(fv))
       
       // d/d(weights(::, i)) == scale(i) * innerAct
       for (i <- 0 until weights.rows) {
