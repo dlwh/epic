@@ -8,10 +8,6 @@ import epic.constraints.LabeledSpanConstraints.PromotedSpanConstraints
  *
  * @author dlwh
  */
-class LongSpanConstraints {
-
-}
-
 object LongSpanConstraints {
   case class Factory[L](maxSimpleLength: Int = 30, okWords: Set[String]) extends ChartConstraints.Factory[L, String] {
     def constraints(w: IndexedSeq[String]): ChartConstraints[L] = {
