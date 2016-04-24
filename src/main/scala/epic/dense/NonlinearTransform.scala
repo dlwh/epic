@@ -103,17 +103,17 @@ object NonlinearTransform {
     def deriv(idx: Int, x: Double) = 0
   }
   
-  case class Mask(val mask: Array[Boolean]) extends NonlinearFcn {
+  case class Mask(mask: Array[Boolean]) extends NonlinearFcn {
     def fcn(idx: Int, x: Double) = if (mask(idx)) x else 0
     def deriv(idx: Int, x: Double) = if (mask(idx)) 1 else 0
   }
   
-  case class ShiftAndScaleEach(val shifts: Array[Double], val factors: Array[Double]) extends NonlinearFcn {
+  case class ShiftAndScaleEach(shifts: Array[Double], factors: Array[Double]) extends NonlinearFcn {
     def fcn(idx: Int, x: Double) = factors(idx) * (x - shifts(idx))
     def deriv(idx: Int, x: Double) = factors(idx)
   }
   
-  case class Scale(val factor: Double) extends NonlinearFcn {
+  case class Scale(factor: Double) extends NonlinearFcn {
     def fcn(idx: Int, x: Double) = factor * x
     def deriv(idx: Int, x: Double) = factor
   }
