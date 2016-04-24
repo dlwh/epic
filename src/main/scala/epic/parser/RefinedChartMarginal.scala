@@ -190,7 +190,7 @@ final case class RefinedChartMarginal[L, W](anchoring: GrammarAnchoring[L, W],
       case UnaryTree( label, _, _, span) =>
         val labelScore = breeze.linalg.softmax(inside.top.decodedLabelScores(span.begin, span.end, anchoring.topology.labelIndex(label)))
         if (labelScore.isInfinite) {
-          logger.warn("problem with unary: " + (label) + " " + span)
+          logger.warn("problem with unary: " + label + " " + span)
         }
       case tree =>
         val labelScore = breeze.linalg.softmax(inside.bot.decodedLabelScores(tree.begin, tree.end, anchoring.topology.labelIndex(tree.label)))

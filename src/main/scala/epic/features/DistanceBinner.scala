@@ -50,7 +50,7 @@ class DistanceBinner private (val binThresholds: Array[Int], preserveDirection: 
         -(binThresholds.last + 1)
       else -binThresholds(-bin-1)
     } else if(bin >= binThresholds.length) {
-        (binThresholds.last + 1)
+        binThresholds.last + 1
     } else binThresholds(bin-1)
   }
 

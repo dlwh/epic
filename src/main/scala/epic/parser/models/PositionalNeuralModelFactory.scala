@@ -162,7 +162,7 @@ You can also epic.trees.annotations.KMAnnotator to get more or less Klein and Ma
       Word2Vec.smartLoadVectorsForVocabulary(word2vecPath.split(":"), voc.toSet, summedWordCounts, if (embeddingType == "trivial") 1 else Int.MaxValue, true, randomizeUnks)
     }
     // Convert Array[Float] values to Array[Double] values and rescale them
-    val word2vecDoubleVect = word2vec.map(keyValue => (keyValue._1 -> keyValue._2.map(_.toDouble * vectorRescaling)))
+    val word2vecDoubleVect = word2vec.map(keyValue => keyValue._1 -> keyValue._2.map(_.toDouble * vectorRescaling))
 //    val word2vecDoubleVect = word2vec.map(keyValue => (keyValue._1 -> new DenseVector[Double](keyValue._2.map(_.toDouble))))
     val word2vecIndexed: Word2VecIndexed[String] = if (embeddingType == "normalpos") {
       Word2VecIndexed(word2vecDoubleVect, (str: String) => Word2Vec.convertWord(str, lowercasedVectors)).augment(freqTagger.tagTypesIdx.size, freqTagger.convertToFeaturizer)

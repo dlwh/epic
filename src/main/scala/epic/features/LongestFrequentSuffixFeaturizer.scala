@@ -30,7 +30,7 @@ class LongestFrequentSuffixFeaturizer private (fixedMap: Map[String, Feature],
   }
 
   private def lookup(x: String):String = {
-    (x).tails.find(suffixCounts(_) >= commonWordThreshold).getOrElse("-UNK-")
+    x.tails.find(suffixCounts(_) >= commonWordThreshold).getOrElse("-UNK-")
   }
 }
 
@@ -44,7 +44,7 @@ object LongestFrequentSuffixFeaturizer {
     suffixCounts = suffixCounts.mapValues(v => v * I(v >= commonWordThreshold))
 
     def lookup(x: String):String = {
-      (x).tails.find(suffixCounts(_) >= commonWordThreshold).getOrElse("-UNK-")
+      x.tails.find(suffixCounts(_) >= commonWordThreshold).getOrElse("-UNK-")
     }
 
     val map = Map.empty ++ (for( (w,v) <- counts.iterator) yield {

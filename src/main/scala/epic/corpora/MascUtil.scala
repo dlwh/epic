@@ -155,26 +155,26 @@ object MascFile {
     
     // Basic segment information
     val segmentXml = loadXML(dirFile(prefix+"-seg.xml"))
-    val segmentRegions = getRegions(segmentXml).map(r => (r.id -> r)).toMap
+    val segmentRegions = getRegions(segmentXml).map(r => r.id -> r).toMap
 
     // POS information
     val pennXml = loadXML(dirFile(prefix+"-penn.xml"))
 
     val tokenRegions = getNodes(pennXml).map { n =>
       val regions = n.targets.map(segmentRegions).sorted
-      (n.id -> MRegion(n.id, regions.head.start, regions.last.end))
+      n.id -> MRegion(n.id, regions.head.start, regions.last.end)
     }.toMap
 
     val tokens = tokenRegions.mapValues(region => rawtext.slice(region.start, region.end))
-    val posAnnotations = getAnnotations(pennXml).map(anno => (anno.ref -> anno)).toMap
+    val posAnnotations = getAnnotations(pennXml).map(anno => anno.ref -> anno).toMap
 
     // NER information
     val neXml = loadXML(dirFile(prefix+"-ne.xml"))
     val neAnnotations =
-      getAnnotations(neXml).map(anno => (anno.ref -> anno)).toMap.withDefault(x=>outsideNe)
+      getAnnotations(neXml).map(anno => anno.ref -> anno).toMap.withDefault(x=>outsideNe)
 
     val neEdges =
-      getEdges(neXml).map(edge => (edge.to -> edge.from)).toMap.withDefault(x=>"outside")
+      getEdges(neXml).map(edge => edge.to -> edge.from).toMap.withDefault(x=>"outside")
 
     // A helper function for pulling out the information associated with a
     // subsequence of the tokens in the document.
@@ -267,7 +267,7 @@ object MascUtil {
   }
     
   def getNodes(doc: Elem) = (doc \\ "node").toSeq.flatMap { nxml =>
-    val link = (nxml \ "link")
+    val link = nxml \ "link"
     if (!link.isEmpty) {
       val targets = (link.head \ "@targets").toString.split(" ").toSeq
       Some(MNode(xmlId(nxml), targets))
@@ -386,7 +386,7 @@ object MascSlab {
     val neXml = XML.load(source.url.toString().replaceAll("[.]txt$", "-ne.xml"))
     
     val idToPos = (for ((span, p) <- slab.iterator[PartOfSpeech]; id <- p.id.iterator) yield id -> (span, p)).toMap
-    val neIdPosIdTuples = MascUtil.getEdges(neXml).map(e => (e.from -> e.to))
+    val neIdPosIdTuples = MascUtil.getEdges(neXml).map(e => e.from -> e.to)
     val neIdToPosIds = neIdPosIdTuples.groupBy(_._1).mapValues(_.map(_._2))
     
     val entityMentions = for (annotation <- MascUtil.getAnnotations(neXml)) yield {

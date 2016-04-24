@@ -619,7 +619,7 @@ object SpanModelFactory {
       baseCat += new BrownClusterFeaturizer(Array(4, 10))
     }
     
-    val leftOfSplit: SplitSpanFeaturizer[String] =  ((baseCat)(-1)apply (split))
+    val leftOfSplit: SplitSpanFeaturizer[String] = baseCat(-1)apply split
     
     var featurizer: SplitSpanFeaturizer[String] = zeroSplit[String]
     featurizer += baseCat(begin)
@@ -634,8 +634,8 @@ object SpanModelFactory {
       featurizer += baseCat(end-2)
       featurizer += baseCat(begin+1)
       featurizer += baseCat(end+1)
-      featurizer +=  ((baseCat)(-2)apply (split))
-      featurizer +=  ((baseCat)(1)apply (split))
+      featurizer += baseCat(-2)apply split
+      featurizer += baseCat(1)apply split
     }
 
     featurizer += distance[String](begin, split)

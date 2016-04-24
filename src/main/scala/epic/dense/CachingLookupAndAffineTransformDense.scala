@@ -49,7 +49,7 @@ case class CachingLookupAndAffineTransformDense[FV](numOutputs: Int,
   }
   
   def getInterestingWeightIndicesForGradientCheck(offset: Int): Seq[Int] = {
-    (offset until offset + Math.min(10, index.size))
+    offset until offset + Math.min(10, index.size)
   }
 
   case class Layer(weights: DenseMatrix[Double], bias: DenseVector[Double]) extends Transform.Layer[Array[Int],DenseVector[Double]] {

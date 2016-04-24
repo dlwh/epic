@@ -63,7 +63,7 @@ object TopDownKBestAStar {
           val end = zipper.end
           val aScore = inside.bot.labelScore(begin, end, root, rootRef)
 
-        val traceOn = (begin == 0 && end == 4)
+        val traceOn = begin == 0 && end == 4
           val spanScore = anchoring.scoreSpan(begin, end, root, rootRef)
           for {
             r <- topology.indexedBinaryRulesWithParent(root)

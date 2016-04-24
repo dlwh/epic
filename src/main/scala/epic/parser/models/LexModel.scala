@@ -941,9 +941,9 @@ case class LexModelFactory(@Help(text= "The kind of annotation to do on the refi
       import dsl._
 
       // class(split + 1)
-      val baseCat = (lfsuf)
+      val baseCat = lfsuf
 
-      val leftOfSplit =  ((baseCat)(-1)apply (split))
+      val leftOfSplit = baseCat(-1)apply split
 
       var featurizer: SplitSpanFeaturizer[String] = zeroSplit[String]
 //      if (useFirstLast) {
