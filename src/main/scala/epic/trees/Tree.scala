@@ -34,7 +34,7 @@ trait Tree[+L] extends Serializable {
   def begin = span.begin
   def end = span.end
 
-  def isLeaf = children.size == 0
+  def isLeaf = children.isEmpty
   /**
   * A tree is valid if this' span contains all children's spans 
   * and each child abuts the next one.
@@ -392,7 +392,7 @@ object Trees {
         else if(tree.span.begin == tree.span.end) None // screw stupid spans
         else {
           val newC = tree.children map this filter (None!=)
-          if(newC.length == 0 && !tree.isLeaf) None
+          if(newC.isEmpty && !tree.isLeaf) None
           else Some(Tree(tree.label,newC map (_.get), tree.span))
         }
       }

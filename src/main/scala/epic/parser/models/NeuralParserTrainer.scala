@@ -129,7 +129,7 @@ object NeuralParserTrainer extends epic.parser.ParserPipeline with LazyLogging {
     if(checkGradient) {
       val cachedObj2 = new CachedBatchDiffFunction(new ModelObjective(model, theTrees.take(opt.batchSize), params.threads))
       val defaultIndices = (0 until 10).map(i => if(i < 0) model.featureIndex.size + i else i)
-      val indices = if (model.transforms.size > 0) {
+      val indices = if (model.transforms.nonEmpty) {
           model.transforms(0).getInterestingWeightIndicesForGradientCheck(0)
       } else {
         defaultIndices

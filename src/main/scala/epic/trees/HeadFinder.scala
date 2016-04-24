@@ -69,7 +69,7 @@ trait HeadFinder[L] {
 
   def annotateHeadIndices[W](t: Tree[L]): Tree[(L, Int)] = t match {
     case t:BinarizedTree[L] => annotateHeadIndices(t)
-    case Tree(l, children, span) if children.length == 0 => Tree(l -> t.span.begin, IndexedSeq.empty, t.span)
+    case Tree(l, children, span) if children.isEmpty => Tree(l -> t.span.begin, IndexedSeq.empty, t.span)
     case Tree(l, children, span) =>
       val headChild = findHeadChild(t)
       val rec = children.map(annotateHeadIndices(_))
@@ -127,7 +127,7 @@ class RuleBasedHeadFinder[L](defaultDirection: Dir = Left, rules: HeadRules[L]) 
   }
 
   def annotateHeadWords[W](t: Tree[L], words: Seq[W]): Tree[(L, W)] = t match {
-    case Tree(l, children, span) if children.length == 0 => Tree(l -> words(t.span.begin), IndexedSeq.empty, t.span)
+    case Tree(l, children, span) if children.isEmpty => Tree(l -> words(t.span.begin), IndexedSeq.empty, t.span)
     case Tree(l, children, span) =>
       val headChild = findHeadChild(t)
       val rec = children.map(annotateHeadWords(_, words))

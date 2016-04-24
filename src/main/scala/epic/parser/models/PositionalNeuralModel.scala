@@ -42,7 +42,7 @@ class PositionalNeuralModel[L, L2, W](annotator: (BinarizedTree[L], IndexedSeq[W
                                       val decoupledTransforms: Seq[OutputTransform[Array[Int],DenseVector[Double]]]) extends ParserModel[L, W] with Serializable {
   
   def mergeWeightsForEnsembling(x1: DenseVector[Double], x2: DenseVector[Double]) = {
-    require(decoupledTransforms.size == 0)
+    require(decoupledTransforms.isEmpty)
     require(x1.size == x2.size)
     // Stack up the dense parts, average the sparse parts
     if (maybeSparseSurfaceFeaturizer.isDefined) {
@@ -55,7 +55,7 @@ class PositionalNeuralModel[L, L2, W](annotator: (BinarizedTree[L], IndexedSeq[W
   }
   
   def cloneModelForEnsembling = {
-    require(decoupledTransforms.size == 0)
+    require(decoupledTransforms.isEmpty)
     // Note that duping the transforms is okay because they still produce distinct
     // layers, so caching behavior is unaffected
     val newTransforms = transforms ++ transforms
@@ -187,8 +187,8 @@ object PositionalNeuralModel {
     val UnaryLayerIdx = 1
     val BinaryLayerIdx = 2
     val dcSpanFeatOffset = layers.map(_.index.size).foldLeft(0)(_ + _) + depLayers.map(_.index.size).foldLeft(0)(_ + _)
-    val dcUnaryFeatOffset = dcSpanFeatOffset + (if (decoupledLayers.size > 0) decoupledLayers(0).index.size else 0)
-    val dcBinaryFeatOffset = dcUnaryFeatOffset + (if (decoupledLayers.size > 0) decoupledLayers(1).index.size else 0)
+    val dcUnaryFeatOffset = dcSpanFeatOffset + (if (decoupledLayers.nonEmpty) decoupledLayers(0).index.size else 0)
+    val dcBinaryFeatOffset = dcUnaryFeatOffset + (if (decoupledLayers.nonEmpty) decoupledLayers(1).index.size else 0)
     
     override def withPermissiveLexicon: Grammar[L, W] = {
       new PositionalNeuralGrammar(topology, lexicon.morePermissive, refinedTopology, refinements, labelFeaturizer, surfaceFeaturizer,
@@ -231,7 +231,7 @@ object PositionalNeuralModel {
           val fv = new FeatureVector(lspec.featuresForUnaryRule(begin, end, rule, ref))
           if (!ruleCountsPerState.contains(tetraIdx)) ruleCountsPerState.put(tetraIdx, SparseVector.zeros[Double](labelFeaturizer.index.size))
           axpy(score, fv, ruleCountsPerState(tetraIdx))
-          if (!decoupledLayers.isEmpty) {
+          if (decoupledLayers.nonEmpty) {
             if (!unaryRuleCountsPerState.contains(tetraIdx)) unaryRuleCountsPerState.put(tetraIdx, SparseVector.zeros[Double](labelFeaturizer.index.size))
             axpy(score, fv, unaryRuleCountsPerState(tetraIdx))
           }
@@ -243,7 +243,7 @@ object PositionalNeuralModel {
           val fv = new FeatureVector(lspec.featuresForSpan(begin, end, tag, ref))
           if (!ruleCountsPerState.contains(tetraIdx)) ruleCountsPerState.put(tetraIdx, SparseVector.zeros[Double](labelFeaturizer.index.size))
           axpy(score, fv, ruleCountsPerState(tetraIdx))
-          if (!decoupledLayers.isEmpty) {
+          if (decoupledLayers.nonEmpty) {
             if (!spanCountsPerState.contains(tetraIdx)) spanCountsPerState.put(tetraIdx, SparseVector.zeros[Double](labelFeaturizer.index.size))
             axpy(score, fv, spanCountsPerState(tetraIdx))
           }
@@ -255,7 +255,7 @@ object PositionalNeuralModel {
           val fv = new FeatureVector(lspec.featuresForBinaryRule(begin, split, end, rule, ref))
           if (!ruleCountsPerState.contains(tetraIdx)) ruleCountsPerState.put(tetraIdx, SparseVector.zeros[Double](labelFeaturizer.index.size))
           axpy(score, fv, ruleCountsPerState(tetraIdx))
-          if (!decoupledLayers.isEmpty) {
+          if (decoupledLayers.nonEmpty) {
             if (!binaryRuleCountsPerState.contains(tetraIdx)) binaryRuleCountsPerState.put(tetraIdx, SparseVector.zeros[Double](labelFeaturizer.index.size))
             axpy(score, fv, binaryRuleCountsPerState(tetraIdx))
           }
@@ -271,7 +271,7 @@ object PositionalNeuralModel {
           layerSizeTally += layers(j).index.size
         }
       }
-      if (!decoupledLayers.isEmpty) {
+      if (decoupledLayers.nonEmpty) {
         for (key <- spanCountsPerState.keySet) {
           val (begin, end, _) = untetra(key)
           val ffeats = sspec.reducedFeaturesForSpan(begin, end)
@@ -344,7 +344,7 @@ object PositionalNeuralModel {
             total += getOrElseUpdateFinal(layerIdx, tetraIdx, rfeat, labelFeaturizer.index.size, { layers(layerIdx).activationsFromPenultimateDot(fs, rfeat) })
           }
         }
-        if (!decoupledLayers.isEmpty) {
+        if (decoupledLayers.nonEmpty) {
           val layerIdx = layers.size + BinaryLayerIdx
           val fs = getOrElseUpdate(layerIdx, tetraIdx, { penultimateDecoupledLayers(BinaryLayerIdx).activations(sspec.featuresForSplit(begin, split, end)) })
           for (rfeat <- rfeats) {
@@ -367,7 +367,7 @@ object PositionalNeuralModel {
             total += getOrElseUpdateFinal(layerIdx, tetraIdx, rfeat, labelFeaturizer.index.size, { layers(layerIdx).activationsFromPenultimateDot(fs, rfeat) })
           }
         }
-        if (!decoupledLayers.isEmpty) {
+        if (decoupledLayers.nonEmpty) {
           val layerIdx = layers.size + UnaryLayerIdx
           val fs = getOrElseUpdate(layerIdx, tetraIdx, { penultimateDecoupledLayers(UnaryLayerIdx).activations(sspec.reducedFeaturesForSpan(begin, end)) })
           for (rfeat <- rfeats) {
@@ -390,7 +390,7 @@ object PositionalNeuralModel {
             total += getOrElseUpdateFinal(layerIdx, tetraIdx, rfeat, labelFeaturizer.index.size, { layers(layerIdx).activationsFromPenultimateDot(fs, rfeat) })
           }
         }
-        if (!decoupledLayers.isEmpty) {
+        if (decoupledLayers.nonEmpty) {
           val layerIdx = layers.size + SpanLayerIdx
           val fs = getOrElseUpdate(layerIdx, tetraIdx, { penultimateDecoupledLayers(SpanLayerIdx).activations(sspec.reducedFeaturesForSpan(begin, end)) })
           for (rfeat <- rfeats) {

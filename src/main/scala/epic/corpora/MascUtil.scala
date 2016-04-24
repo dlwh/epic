@@ -179,7 +179,7 @@ object MascFile {
     // A helper function for pulling out the information associated with a
     // subsequence of the tokens in the document.
     def orderedTokPosNer(orderedRegions: Seq[MRegion]) = {
-      if (orderedRegions.length == 0) None
+      if (orderedRegions.isEmpty) None
       else {
         val orderedTokens = orderedRegions.map(reg=>tokens(reg.id))
         
@@ -268,7 +268,7 @@ object MascUtil {
     
   def getNodes(doc: Elem) = (doc \\ "node").toSeq.flatMap { nxml =>
     val link = nxml \ "link"
-    if (!link.isEmpty) {
+    if (link.nonEmpty) {
       val targets = (link.head \ "@targets").toString.split(" ").toSeq
       Some(MNode(xmlId(nxml), targets))
     } else throw new Exception("Missing link element.") //None OK?
