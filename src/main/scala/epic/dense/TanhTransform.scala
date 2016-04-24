@@ -27,7 +27,7 @@ case class TanhTransform[FV](inner: Transform[FV, DenseVector[Double]]) extends 
     
     val myIndex = Index[Feature]
     
-    def index = myIndex;
+    def index = myIndex
 
     def activations(fv: FV): DenseVector[Double] = {
       val act = innerLayer.activations(fv) * 2.0

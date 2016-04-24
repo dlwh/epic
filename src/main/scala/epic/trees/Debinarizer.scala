@@ -8,20 +8,17 @@ import java.io.ObjectStreamException
  *
  * @author dlwh
  **/
-trait Debinarizer[L] extends (BinarizedTree[L]=>Tree[L]) with Serializable {
-
-}
+trait Debinarizer[L] extends (BinarizedTree[L] => Tree[L]) with Serializable
 
 object Debinarizer {
   @SerialVersionUID(1L)
   implicit object AnnotatedLabelDebinarizer extends Debinarizer[AnnotatedLabel] {
 
     def apply(t: BinarizedTree[AnnotatedLabel]): Tree[AnnotatedLabel] = {
-      Trees.debinarize(replaceUnaries(t), {(_:AnnotatedLabel).isIntermediate}).map(_.baseAnnotatedLabel)
+      Trees.debinarize(replaceUnaries(t), {(_: AnnotatedLabel).isIntermediate}).map(_.baseAnnotatedLabel)
     }
 
-
-    def replaceUnaries(t: Tree[AnnotatedLabel]):Tree[AnnotatedLabel] = t match {
+    def replaceUnaries(t: Tree[AnnotatedLabel]): Tree[AnnotatedLabel] = t match {
       case UnaryTree(a, child, chain, span) if a.label == child.label.label && chain.isEmpty =>
         replaceUnaries(child)
       case UnaryTree(a, child, chain, span) =>
@@ -37,7 +34,6 @@ object Debinarizer {
       case _ => t
     }
 
-
   }
 
   @SerialVersionUID(1L)
@@ -47,7 +43,7 @@ object Debinarizer {
       Trees.debinarize(Trees.deannotate(replaceUnaries(t)))
     }
 
-    def replaceUnaries(t: Tree[String]):Tree[String] = t match {
+    def replaceUnaries(t: Tree[String]): Tree[String] = t match {
       case UnaryTree(a, child, chain, span) if a == child.label && chain.isEmpty =>
         replaceUnaries(child)
       case UnaryTree(a, child, chain, span) =>
@@ -63,8 +59,5 @@ object Debinarizer {
       case _ => t
     }
   }
-
-
-
 
 }

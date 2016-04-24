@@ -26,12 +26,10 @@ object SurfaceFeaturizer {
 
   def apply[W](f: (IndexedSeq[W], Span)=>Array[Feature]):SurfaceFeaturizer[W] = new TabulatedSurfaceFeaturizer[W](f)
 
-
   /** begin of span */
   object begin extends MarkerPos(0)
   /** end of span */
   object end extends MarkerPos(0, false)
-
 
   trait DSL {
 
@@ -70,7 +68,7 @@ object SurfaceFeaturizer {
   case class SpanEdgesFeaturizer[W](f1: MarkedWordFeaturizer[W], f2: MarkedWordFeaturizer[W]) extends SurfaceFeaturizer[W] {
     def anchor(w: IndexedSeq[W]): SurfaceFeatureAnchoring[W] = {
       val loc1 = f1.wf.anchor(w)
-      val loc2 = if(f1.wf eq f2.wf) loc1 else f2.wf.anchor(w)
+      val loc2 = if (f1.wf eq f2.wf) loc1 else f2.wf.anchor(w)
       new SurfaceFeatureAnchoring[W] {
         def featuresForSpan(begin: Int, end: Int): Array[Feature] = {
           val ffs1 = loc1.featuresForWord(f1.mp.toPos(begin, end))
@@ -90,7 +88,6 @@ object SurfaceFeaturizer {
       }
     }
   }
-
 
   case class SingleWordSpanFeaturizer[W](feat: WordFeaturizer[W]) extends SurfaceFeaturizer[W] with Serializable {
     override def anchor(words: IndexedSeq[W]): SurfaceFeatureAnchoring[W] = new SurfaceFeatureAnchoring[W] {
@@ -126,9 +123,9 @@ object SurfaceFeaturizer {
     def +(i: Int) = apply(i)
     def -(i: Int) = apply(-i)
 
-    def toPos(begin: Int, end: Int) = if(relativeToBegin) begin + offset else end + offset
+    def toPos(begin: Int, end: Int) = if (relativeToBegin) begin + offset else end + offset
 
-    override def toString =  s"(${if(relativeToBegin) "b" else "e"}${if(offset == 0) "" else if(offset > 0) "+" + offset else offset})"
+    override def toString =  s"(${if (relativeToBegin) "b" else "e"}${if (offset == 0) "" else if (offset > 0) "+" + offset else offset})"
   }
 
   class TabulatedSurfaceFeaturizer[W](f: (IndexedSeq[W], Span)=>Array[Feature]) extends SurfaceFeaturizer[W] {

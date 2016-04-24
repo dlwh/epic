@@ -8,8 +8,8 @@ class HackyLexicalSplitFeaturizer[W]() extends SplitSpanFeaturizer[W] {
   
   private val theSplitNeedingAnchoring = new SplitSpanFeatureAnchoring[W] with Serializable {
     def featuresForSplit(begin: Int, split: Int, end: Int): Array[Feature] = {
-        emptyArray;
-//        Array(DistanceFeature(db.binnedDistance((end-split) - (split-begin)), label))
+        emptyArray
+        // Array(DistanceFeature(db.binnedDistance((end-split) - (split-begin)), label))
     }
 
     def featuresForSpan(begin: Int, end: Int): Array[Feature] = emptyArray

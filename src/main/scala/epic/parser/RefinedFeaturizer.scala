@@ -19,7 +19,6 @@ import epic.trees.{LexicalProduction, Production, Rule}
 import breeze.util.Index
 import epic.framework.Feature
 
-
 /**
  *
  * @author dlwh

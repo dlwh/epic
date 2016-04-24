@@ -15,12 +15,10 @@ class LongestFrequentSuffixFeaturizer private (fixedMap: Map[String, Feature],
   def anchor(w: IndexedSeq[String]): WordFeatureAnchoring[String] = new WordFeatureAnchoring[String] {
     val feats = words.map(w => Array(fixedMap.getOrElse(w, LongestFrequentSuffix(lookup(w)))))
 
-    def featuresForWord(pos: Int): Array[Feature] = if(pos < 0 || pos >= w.length) Array(BeginSentFeature) else feats(pos)
+    def featuresForWord(pos: Int): Array[Feature] = if (pos < 0 || pos >= w.length) Array(BeginSentFeature) else feats(pos)
 
     def words: IndexedSeq[String] = w
   }
-
-
 
   def lookupSentence(sent: IndexedSeq[String]) = {
     sent.map(w => fixedMap.getOrElse(w, LongestFrequentSuffix(lookup(w))) match {
@@ -29,8 +27,8 @@ class LongestFrequentSuffixFeaturizer private (fixedMap: Map[String, Feature],
     })
   }
 
-  private def lookup(x: String):String = {
-    (x).tails.find(suffixCounts(_) >= commonWordThreshold).getOrElse("-UNK-")
+  private def lookup(x: String): String = {
+    x.tails.find(suffixCounts(_) >= commonWordThreshold).getOrElse("-UNK-")
   }
 }
 
@@ -43,12 +41,12 @@ object LongestFrequentSuffixFeaturizer {
 
     suffixCounts = suffixCounts.mapValues(v => v * I(v >= commonWordThreshold))
 
-    def lookup(x: String):String = {
-      (x).tails.find(suffixCounts(_) >= commonWordThreshold).getOrElse("-UNK-")
+    def lookup(x: String): String = {
+      x.tails.find(suffixCounts(_) >= commonWordThreshold).getOrElse("-UNK-")
     }
 
     val map = Map.empty ++ (for( (w,v) <- counts.iterator) yield {
-      if(v > commonWordThreshold)
+      if (v > commonWordThreshold)
         w -> IndicatorFeature(w)
       else
         w -> LongestFrequentSuffix(lookup(w))

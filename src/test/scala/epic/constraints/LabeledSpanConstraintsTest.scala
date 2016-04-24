@@ -14,9 +14,9 @@ class LabeledSpanConstraintsTest extends FunSuite {
   /*
   test("serialization") {
     val x = LabeledSpanConstraints[Int](TriangularArray.tabulate(10) { (i,j) =>
-      if(i == j || i > 5) null
+      if (i == j || i > 5) null
       else {
-        if(i < j - 1) BitSet(1,2,3,4)
+        if (i < j - 1) BitSet(1,2,3,4)
         else BitSet(i,j)
       }
 
@@ -37,15 +37,15 @@ class LabeledSpanConstraintsTest extends FunSuite {
   test("containsAll") {
 
     val x = LabeledSpanConstraints[Int](TriangularArray.tabulate(10) { (i,j) =>
-      if(i == j || i > 5) null
+      if (i == j || i > 5) null
       else {
-        if(i < j) BitSet(1,2,3,4)
+        if (i < j) BitSet(1,2,3,4)
         else BitSet(1)
       }
 
     })
     val z = LabeledSpanConstraints[Int](TriangularArray.tabulate(10) { (i,j) =>
-      if(i < j) BitSet(1,2,3,4)
+      if (i < j) BitSet(1,2,3,4)
       else BitSet(1)
     })
 

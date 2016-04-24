@@ -17,7 +17,7 @@ class SegmentationTest extends FunSuite with Checkers {
     } yield {
       val segments = segs.foldLeft((Vector((0,Span(0,0))))) { (cur, sl) =>
         val (segId, len) = sl
-        if(segId == 0) cur :+ (segId -> Span(cur.last._2.end, cur.last._2.end + 1))
+        if (segId == 0) cur :+ (segId -> Span(cur.last._2.end, cur.last._2.end + 1))
         else cur :+ (segId -> Span(cur.last._2.end, cur.last._2.end + len))
       }
       Segmentation(segments.drop(1), 0 until segments.last._2.end)

@@ -48,9 +48,9 @@ object SemiPOSTagger extends LazyLogging {
 
     val crf = SemiCRF.buildSimple(train, opt = opt)
     val inf = crf.asInstanceOf[SemiCRFInference[_, _]]
-//    val out = new PrintWriter(new BufferedOutputStream(new FileOutputStream("weights.txt")))
-//    Encoder.fromIndex(inf.featureIndex).decode(inf.weights).iterator foreach {case (x, v) if v.abs > 1E-6 => out.println(x -> v) case _ => }
-//    out.close()
+    // val out = new PrintWriter(new BufferedOutputStream(new FileOutputStream("weights.txt")))
+    // Encoder.fromIndex(inf.featureIndex).decode(inf.weights).iterator foreach {case (x, v) if v.abs > 1E-6 => out.println(x -> v) case _ => }
+    // out.close()
     val stats = SegmentationEval.eval(crf, test)
     println("Final Stats: " + stats)
   }

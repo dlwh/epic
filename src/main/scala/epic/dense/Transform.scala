@@ -12,29 +12,19 @@ import scala.util.Random
  */
 trait Transform[In, +Out] extends Serializable  {
   val index: Index[Feature]
-
-
   def extractLayer(dv: DenseVector[Double], forTrain: Boolean):Layer
-  
   def initialWeightVector(initWeightsScale: Double, rng: Random, outputLayer: Boolean, spec: String): DenseVector[Double]
-
   def clipHiddenWeightVectors(weights: DenseVector[Double], norm: Double, outputLayer: Boolean)
-  
-  def getInterestingWeightIndicesForGradientCheck(offset: Int): Seq[Int];
-  
+  def getInterestingWeightIndicesForGradientCheck(offset: Int): Seq[Int]
   type Layer <: Transform.Layer[In,Out]
 }
 
 object Transform {
   
   trait Layer[In, +Out] {
-
-    def index: Index[Feature];
-
+    def index: Index[Feature]
     def activations(fv: In):Out
-
     def tallyDerivative(deriv: DenseVector[Double], scale: =>Vector[Double], fv: In)
-
     def applyBatchNormalization(inputs: scala.collection.GenTraversable[In])
   }
 

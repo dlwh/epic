@@ -20,8 +20,6 @@ class ProductWordFeaturizer[W](f1: WordFeaturizer[W], f2: WordFeaturizer[W]) ext
     }
 
     def words: IndexedSeq[W] = w
-
-
   }
 
 }

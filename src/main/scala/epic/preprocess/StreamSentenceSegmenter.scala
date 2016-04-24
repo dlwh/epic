@@ -39,11 +39,11 @@ class StreamSentenceSegmenter(val baseSegmenter: SentenceSegmenter, segmentOnNew
     val buffer = new Array[Char](1024 * 1024)
     var done = false
     Iterators.fromProducer {
-      if(done)  {
+      if (done)  {
         None
       } else {
         val numRead = reader.read(buffer)
-        if(numRead == -1) {
+        if (numRead == -1) {
           done = true
           None
         } else {

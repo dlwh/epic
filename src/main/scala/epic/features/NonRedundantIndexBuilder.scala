@@ -17,7 +17,7 @@ class NonRedundantIndexBuilder[F]  extends IndexBuilder[F]  {
 
     for(f <- 0 until allSeenFeatures.size) {
       val c = contexts(f)
-      if(!c.exists(seenContexts)) {
+      if (!c.exists(seenContexts)) {
         c.foreach(seenContexts += _)
         result.index(allSeenFeatures.get(f))
       }
@@ -37,7 +37,7 @@ class NonRedundantIndexBuilder[F]  extends IndexBuilder[F]  {
 
     for(x <- featuresForContext) {
       val next = allSeenFeatures.index(x)
-      if(contexts.length <= next) {
+      if (contexts.length <= next) {
         contexts += Some(mutable.Set[Int](nextContext))
       } else {
         contexts(next).foreach(_ += nextContext)

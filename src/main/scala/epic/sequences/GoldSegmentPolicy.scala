@@ -30,7 +30,7 @@ object GoldSegmentPolicy {
   def goldSegmentForcing[L](trees: IndexedSeq[(Int,Span)]*):GoldSegmentPolicy[L] ={
     val gold = TriangularArray.raw(trees.last.last._2.end+1,collection.mutable.BitSet())
     for(tree <- trees) {
-      if(tree != null) {
+      if (tree != null) {
         for( (label, span) <- tree) {
           gold(TriangularArray.index(span.begin,span.end)) += label
         }

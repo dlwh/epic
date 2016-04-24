@@ -21,10 +21,9 @@ package epic.trees
  */
 object TstTreebank {
   val treebank =  {
-    val train = TstTreebank.getClass.getClassLoader.getResource("smallbank/train");
-    val test = TstTreebank.getClass.getClassLoader.getResource("smallbank/test");
-    val dev = TstTreebank.getClass.getClassLoader.getResource("smallbank/dev");
-
-    new SimpleTreebank(Map("train"->train),Map("dev"->dev),Map("test"->test));
+    val train = TstTreebank.getClass.getClassLoader.getResource("smallbank/train")
+    val test = TstTreebank.getClass.getClassLoader.getResource("smallbank/test")
+    val dev = TstTreebank.getClass.getClassLoader.getResource("smallbank/dev")
+    new SimpleTreebank(Map("train"->train),Map("dev"->dev),Map("test"->test))
   }
 }

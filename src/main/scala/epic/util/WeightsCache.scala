@@ -17,8 +17,8 @@ object WeightsCache {
     require(weights.length == index.size)
     val out = new PrintStream(new GZIPOutputStream(new FileOutputStream(file), 1024))
     var i = 0
-    while(i < index.size) {
-      if(weights(i).abs > threshold)
+    while (i < index.size) {
+      if (weights(i).abs > threshold)
         out.println(index.get(i) + "\t" + weights(i))
       i += 1
     }

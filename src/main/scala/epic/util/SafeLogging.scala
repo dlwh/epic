@@ -14,10 +14,10 @@ trait SafeLogging {
 
   def logger: Logger = {
     var logger = _the_logger
-    if(logger eq null) {
+    if (logger eq null) {
       synchronized {
         logger = _the_logger
-        if(logger eq null) {
+        if (logger eq null) {
           val ll = Logger(LoggerFactory.getLogger(this.getClass))
           _the_logger = ll
           logger = ll
@@ -26,6 +26,5 @@ trait SafeLogging {
     }
     logger
   }
-
 
 }

@@ -27,33 +27,24 @@ sealed trait Production[@specialized(Int) +L, +W] extends Feature {
 
 sealed trait Rule[@specialized(Int) +L] extends Production[L, Nothing] {
   def parent: L
-
   def children: Seq[L]
-
   def symbols = parent +: children
-
   def map[A](f: L => A): Rule[A]
-
   def mapChildren[A >: L](f: L => A): Rule[A]
 }
 
 @SerialVersionUID(8613629952079423488L)
 final case class BinaryRule[@specialized(Int) +L](parent: L, left: L, right: L) extends Rule[L] {
   def children = Seq(left, right)
-
   def map[A](f: L => A) = BinaryRule(f(parent), f(left), f(right))
-
   def mapChildren[A >: L](f: L => A) = BinaryRule(parent, f(left), f(right))
 }
 
 @SerialVersionUID(8559479322874082992L)
 final case class UnaryRule[@specialized(Int) +L](parent: L, child: L, chain: IndexedSeq[String]) extends Rule[L] {
   def children = Seq(child)
-
   def map[A](f: L => A) = UnaryRule(f(parent), f(child), chain)
-
   def mapChildren[A >: L](f: L => A) = UnaryRule(parent, f(child), chain)
-
   def isIdentity = chain.isEmpty && parent == child
 }
 
@@ -64,7 +55,6 @@ final case class LexicalProduction[@specialized(Int) +L, +W](parent: L, word: W)
 case class NullRule[@specialized(Int) +L](parent: L) extends Production[L, Nothing] {
   def map[A](f: (L) => A): NullRule[A] = NullRule(f(parent))
 }
-
 
 object BinaryRule {
   def leftChildFirstOrdering[L:Ordering]:Ordering[BinaryRule[L]] = Ordering.Tuple3[L, L, L].on(br => (br.left, br.right, br.parent))

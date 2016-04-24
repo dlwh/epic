@@ -82,7 +82,7 @@ object NeuralParserTrainer extends epic.parser.ParserPipeline with LazyLogging {
     import params._
     import extraPTParams._
     
-//    if(threads >= 1)
+//    if (threads >= 1)
 //      collection.parallel.ForkJoinTasks.defaultForkJoinPool.setParallelism(params.threads)
 
     val initialParser = params.parser match {
@@ -107,14 +107,14 @@ object NeuralParserTrainer extends epic.parser.ParserPipeline with LazyLogging {
 
     var theTrees = trainTrees.toIndexedSeq.filterNot(sentTooLong(_, params.maxParseLength))
 
-    if(useConstraints && enforceReachability)  {
+    if (useConstraints && enforceReachability)  {
       val treebankGrammar = GenerativeParser.annotated(initialParser.topology, initialParser.lexicon, TreeAnnotator.identity, trainTrees)
       val markovizedGrammar = GenerativeParser.annotated(initialParser.topology, initialParser.lexicon, annotator, trainTrees)
       val proj = new OracleParser(treebankGrammar, markovizedGrammar)
       theTrees = theTrees.par.map(ti => ti.copy(tree=proj.forTree(ti.tree, ti.words, constraints.constraints(ti.words)))).seq.toIndexedSeq
     }
 
-    val baseMeasure = if(useConstraints) {
+    val baseMeasure = if (useConstraints) {
       constraints
     } else {
       ChartConstraints.Factory.noSparsity[AnnotatedLabel, String]
@@ -126,10 +126,10 @@ object NeuralParserTrainer extends epic.parser.ParserPipeline with LazyLogging {
     val cachedObj = new CachedBatchDiffFunction(obj)
     println("Initializing weights custom for model " + model.getClass)
     val init = model.initialWeightVector(initWeightsScale, initializerSpec)
-    if(checkGradient) {
+    if (checkGradient) {
       val cachedObj2 = new CachedBatchDiffFunction(new ModelObjective(model, theTrees.take(opt.batchSize), params.threads))
-      val defaultIndices = (0 until 10).map(i => if(i < 0) model.featureIndex.size + i else i)
-      val indices = if (model.transforms.size > 0) {
+      val defaultIndices = (0 until 10).map(i => if (i < 0) model.featureIndex.size + i else i)
+      val indices = if (model.transforms.nonEmpty) {
           model.transforms(0).getInterestingWeightIndicesForGradientCheck(0)
       } else {
         defaultIndices
@@ -151,7 +151,6 @@ object NeuralParserTrainer extends epic.parser.ParserPipeline with LazyLogging {
         logger.info("Overall statistics for validation: " + stats)
       }
     }
-
 
     val name = Option(params.name).orElse(Option(model.getClass.getSimpleName).filter(_.nonEmpty)).getOrElse("DiscrimParser")
     val itr: Iterator[FirstOrderMinimizer[DenseVector[Double], BatchDiffFunction[DenseVector[Double]]]#State] = if (determinizeTraining) {
@@ -208,7 +207,7 @@ object NeuralParserTrainer extends epic.parser.ParserPipeline with LazyLogging {
   
   def evaluateNow = {
     val sentinel = new File("EVALUATE_NOW")
-    if(sentinel.exists()) {
+    if (sentinel.exists()) {
       sentinel.delete()
       logger.info("Evaluating now!!!!")
       true

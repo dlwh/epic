@@ -43,7 +43,7 @@ class KMAnnotatorTest extends FunSuite {
     // make sure the S dominates a V
     assert(pipelined.allChildren.exists(t => t.label.label == "S" && t.label.hasAnnotation(Dom("V"))), "DomV2")
     // make sure the @S dominates a V and has an NP to its left
-    if(pipelined.allChildren.exists(t => t.label.label == "@S" && t.label.hasAnnotation(Dom("V")) && t.label.siblings.nonEmpty && t.label.siblings(0) == Right("."))) {
+    if (pipelined.allChildren.exists(t => t.label.label == "@S" && t.label.hasAnnotation(Dom("V")) && t.label.siblings.nonEmpty && t.label.siblings(0) == Right("."))) {
 
     } else {
       fail(pipelined.toString + " " + pipelined.map(label => label -> ( label.label == "@S" , label.hasAnnotation(Dom("V")) , label.siblings.map(_ == Right(".")))))

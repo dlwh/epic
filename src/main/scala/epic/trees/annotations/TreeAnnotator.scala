@@ -87,8 +87,6 @@ case class StripAnnotations[W]() extends TreeAnnotator[AnnotatedLabel, W, Annota
   }
 }
 
-
-
 /**
  * Removes all features from the [[epic.trees.AnnotatedLabel]]
  * @tparam W
@@ -107,10 +105,9 @@ case class Markovize[W](horizontal: Int=0, vertical: Int=2) extends TreeAnnotato
   }
 }
 
-
 case class ParentAnnotate[W](order: Int = 0,  skipPunctTags: Boolean = true) extends TreeAnnotator[AnnotatedLabel, W, AnnotatedLabel] {
   def apply(tree: BinarizedTree[AnnotatedLabel], words: Seq[W]) = {
-    if(order == 0) {
+    if (order == 0) {
       tree
     } else {
       def join(base: AnnotatedLabel, parent: Seq[AnnotatedLabel]) = {
@@ -122,15 +119,13 @@ case class ParentAnnotate[W](order: Int = 0,  skipPunctTags: Boolean = true) ext
         case ex: AssertionError =>
           throw new RuntimeException(s"While handling $words", ex)
       }
-
     }
   }
-
 }
 
 case class ParentAnnotatePosTags[W](order: Int = 1,  skipPunctTags: Boolean = true) extends TreeAnnotator[AnnotatedLabel, W, AnnotatedLabel] {
   def apply(tree: BinarizedTree[AnnotatedLabel], words: Seq[W]) = {
-    if(order == 0) {
+    if (order == 0) {
       tree
     } else {
       def join(base: AnnotatedLabel, parent: Seq[AnnotatedLabel]) = {
@@ -139,20 +134,17 @@ case class ParentAnnotatePosTags[W](order: Int = 1,  skipPunctTags: Boolean = tr
       Trees.annotateParentsBinarized(tree, join, {(_:AnnotatedLabel).isIntermediate}, {(l:Tree[AnnotatedLabel])=> !(l.isLeaf || l.children.length == 1 && l.children.head.label.label == l.label.label && l.span.length == 1)  || l.label.label.isEmpty || (l.label.label.head != '@' && !l.label.label.head.isLetterOrDigit)}, order)
     }
   }
-
 }
 
 case class ForgetHeadTag[W]() extends TreeAnnotator[AnnotatedLabel, W, AnnotatedLabel] {
   def apply(tree: BinarizedTree[AnnotatedLabel], words: Seq[W]) = {
     tree.map(_.copy(headTag=None))
   }
-
 }
-
 
 case class MarkovizeSiblings[W](order: Int=0) extends TreeAnnotator[AnnotatedLabel, W, AnnotatedLabel] {
   def apply(tree: BinarizedTree[AnnotatedLabel], words: Seq[W]) = {
-    if(order == 0) tree.map {l => l.copy(siblings = IndexedSeq.empty)}
+    if (order == 0) tree.map {l => l.copy(siblings = IndexedSeq.empty)}
     else tree.map { l => l.copy(siblings = l.siblings.takeRight(order)) }
   }
 
@@ -169,7 +161,6 @@ case class MarkovizeSiblings[W](order: Int=0) extends TreeAnnotator[AnnotatedLab
   }
   */
 
-
 }
 /**
  * Marks verb tags based on the auxiliary
@@ -179,22 +170,19 @@ case class SplitAuxiliary() extends TreeAnnotator[AnnotatedLabel, String, Annota
   val hasVerbs = Set("has", "have", "had")
 
   def apply(tree: BinarizedTree[AnnotatedLabel], words: Seq[String]) = {
-    tree.extend { t =>
-      t match {
-        case UnaryTree(label, NullaryTree(lbl2, _), chain, span) if label.baseLabel == lbl2.baseLabel =>
-          val w = words(span.begin)
-          if (beVerbs.contains(w.toLowerCase)) label.annotate(AuxBe).annotate(Aux)
-          else if (hasVerbs.contains(w.toLowerCase)) label.annotate(AuxHave).annotate(Aux)
-          else label
-        case NullaryTree(label, span) =>
-          val w = words(span.begin)
-          if (beVerbs.contains(w.toLowerCase)) label.annotate(AuxBe).annotate(Aux)
-          else if (hasVerbs.contains(w.toLowerCase)) label.annotate(AuxHave).annotate(Aux)
-          else label
-        case _ => t.label
-      }
+    tree.extend {
+      case UnaryTree(label, NullaryTree(lbl2, _), chain, span) if label.baseLabel == lbl2.baseLabel =>
+        val w = words(span.begin)
+        if (beVerbs.contains(w.toLowerCase)) label.annotate(AuxBe).annotate(Aux)
+        else if (hasVerbs.contains(w.toLowerCase)) label.annotate(AuxHave).annotate(Aux)
+        else label
+      case NullaryTree(label, span) =>
+        val w = words(span.begin)
+        if (beVerbs.contains(w.toLowerCase)) label.annotate(AuxBe).annotate(Aux)
+        else if (hasVerbs.contains(w.toLowerCase)) label.annotate(AuxHave).annotate(Aux)
+        else label
+      case t => t.label
     }
-
   }
 
 }
@@ -213,7 +201,7 @@ case class SplitPunct() extends TreeAnnotator[AnnotatedLabel, String, AnnotatedL
         val w = words(span.begin)
 
         if (w.forall(!_.isLetterOrDigit) && label.baseLabel != w) label.annotate(Punct(w))
-        else if(w.matches("-[LR].B-") && label.baseLabel != w) label.annotate(Punct(w))
+        else if (w.matches("-[LR].B-") && label.baseLabel != w) label.annotate(Punct(w))
         else label
       case NullaryTree(label, span) =>
         val w = words(span.begin)
@@ -232,7 +220,7 @@ case class SplitPunct() extends TreeAnnotator[AnnotatedLabel, String, AnnotatedL
 case class SplitVP() extends TreeAnnotator[AnnotatedLabel, String, AnnotatedLabel] {
   val finiteVerbs = Set("VBZ", "VBD", "VBP", "MD")
   def apply(tree: BinarizedTree[AnnotatedLabel], words: Seq[String]) = tree.extend { t =>
-    if(t.label.baseLabel != "VP") {
+    if (t.label.baseLabel != "VP") {
       t.label
     } else {
       val headTag = HeadFinder.collins.lensed[AnnotatedLabel].findHeadTag(t)
@@ -247,7 +235,6 @@ case class SplitVP() extends TreeAnnotator[AnnotatedLabel, String, AnnotatedLabe
 
 }
 
-
 case class SplitIN[W]() extends TreeAnnotator[AnnotatedLabel, W, AnnotatedLabel] {
   def apply(tree: BinarizedTree[AnnotatedLabel], words: Seq[W]) = {
     def rec(tree: BinarizedTree[AnnotatedLabel], root: String,
@@ -256,14 +243,14 @@ case class SplitIN[W]() extends TreeAnnotator[AnnotatedLabel, W, AnnotatedLabel]
       val blbl = tree.label.baseLabel
       tree match {
         case tree@NullaryTree(lbl, span) if blbl == "IN" =>
-        if(grandParent.isEmpty || grandParent.exists(_ == root) || parent.exists(_ == root)) {
+        if (grandParent.isEmpty || grandParent.contains(root) || parent.contains(root)) {
           tree
-        } else if (grandParent.exists(_(0) == 'N') && (parent.exists(s => s(0) == 'P' || s(0) == 'A'))) {
+        } else if (grandParent.exists(_(0) == 'N') && parent.exists(s => s(0) == 'P' || s(0) == 'A')) {
           tree.copy(lbl.annotate(IN_N), span)
-        } else if (parent.exists(_(0) == 'Q') && (grandParent.exists(s => s(0) == 'N' || s.startsWith("ADJP")))) {
+        } else if (parent.exists(_(0) == 'Q') && grandParent.exists(s => s(0) == 'N' || s.startsWith("ADJP"))) {
           tree.copy(lbl.annotate(IN_Q), span)
-        } else if(grandParent.exists(_ == "S")) {
-          if(parent.exists(_ == "SBAR")) {
+        } else if (grandParent.contains("S")) {
+          if (parent.contains("SBAR")) {
             tree.copy(lbl.annotate(IN_SCC), span)
           } else {
             tree.copy(lbl.annotate(IN_SC), span)
@@ -272,8 +259,8 @@ case class SplitIN[W]() extends TreeAnnotator[AnnotatedLabel, W, AnnotatedLabel]
           tree
         }
         case u @ UnaryTree(lbl, c, chain, span) =>
-        if(blbl != "IN") {
-          if(parent.exists(_ != blbl))
+        if (blbl != "IN") {
+          if (parent.exists(_ != blbl))
             u.copy(lbl, rec(c, root, Some(blbl), parent))
             else
               u.copy(lbl, rec(c, root, parent, grandParent))
@@ -293,7 +280,7 @@ case class SplitIN[W]() extends TreeAnnotator[AnnotatedLabel, W, AnnotatedLabel]
 
 case class SplitPossNP[W]() extends TreeAnnotator[AnnotatedLabel, W, AnnotatedLabel] {
   def apply(tree: BinarizedTree[AnnotatedLabel], words: Seq[W]) = tree.extend { t =>
-    if(t.label.baseLabel != "NP") t.label
+    if (t.label.baseLabel != "NP") t.label
     else {
       val headTag = HeadFinder.collins.lensed[AnnotatedLabel].findHeadTag(t)
       if (headTag.baseLabel == "POS") {
@@ -320,7 +307,7 @@ case class AnnotateBaseNP[W]() extends TreeAnnotator[AnnotatedLabel, W, Annotate
         t -> true
       case t@UnaryTree(lbl1, child, chain, span) =>
         val (newchild, ok) = rec(child)
-        if(lbl1.baseLabel == "NP" && (ok || newchild.label.hasAnnotation(BaseNP))) {
+        if (lbl1.baseLabel == "NP" && (ok || newchild.label.hasAnnotation(BaseNP))) {
           UnaryTree(lbl1.annotate(BaseNP), newchild, chain, span) -> lbl1.isIntermediate
         } else {
           UnaryTree(lbl1, newchild, chain, span) -> false
@@ -328,12 +315,11 @@ case class AnnotateBaseNP[W]() extends TreeAnnotator[AnnotatedLabel, W, Annotate
       case t@BinaryTree(lbl, lc, rc, span) =>
         val (newlc, lok) = rec(lc)
         val (newrc, rok) = rec(rc)
-        if(lok && rok && lbl.baseLabel == "NP") {
+        if (lok && rok && lbl.baseLabel == "NP") {
           BinaryTree(lbl.annotate(BaseNP), newlc, newrc, span) -> lbl.isIntermediate
         } else {
           BinaryTree(lbl, newlc, newrc, span) -> false
         }
-
     }
     rec(tree)._1
 
@@ -354,7 +340,7 @@ case class AnnotateRightRecNP[W]() extends TreeAnnotator[AnnotatedLabel, W, Anno
     def rec(tree: BinarizedTree[AnnotatedLabel]):BinarizedTree[AnnotatedLabel] = tree match {
       case t@UnaryTree(lbl1, child, chain, span) =>
         val newchild = rec(child)
-        if(lbl1.baseLabel == "NP" && newchild.label.hasAnnotation(RightRecNP)) {
+        if (lbl1.baseLabel == "NP" && newchild.label.hasAnnotation(RightRecNP)) {
           UnaryTree(lbl1.annotate(RightRecNP), newchild, chain, span)
         } else {
           UnaryTree(lbl1, newchild, chain, span)
@@ -363,7 +349,7 @@ case class AnnotateRightRecNP[W]() extends TreeAnnotator[AnnotatedLabel, W, Anno
         val newrc = rec(rc)
         val isRightRec = lbl.baseLabel == "NP" && (newrc.label.label == "NP" || (newrc.label.label == "@NP" && newrc.label.hasAnnotation(RightRecNP)))
         val newlc = rec(lc)
-        if(isRightRec) {
+        if (isRightRec) {
           val lclc = annotateDownwards(newlc)
           BinaryTree(lbl.annotate(RightRecNP), lclc, newrc, span)
         } else {
@@ -379,7 +365,7 @@ case class AnnotateRightRecNP[W]() extends TreeAnnotator[AnnotatedLabel, W, Anno
       case UnaryTree(lbl, child, chain, span) if lbl.label == "@NP" =>
         UnaryTree(lbl.annotate(RightRecNP), annotateDownwards(child), chain, span)
       case BinaryTree(lbl, lc, rc, span) if lbl.label == "@NP" =>
-        BinaryTree(lbl.annotate(RightRecNP), if(lc.label.isIntermediate) annotateDownwards(lc) else lc, if(rc.label.isIntermediate) annotateDownwards(rc) else rc, span)
+        BinaryTree(lbl.annotate(RightRecNP), if (lc.label.isIntermediate) annotateDownwards(lc) else lc, if (rc.label.isIntermediate) annotateDownwards(rc) else rc, span)
       case _ => tree
     }
     rec(tree)
@@ -397,9 +383,9 @@ case class AnnotateDomCC[W]() extends TreeAnnotator[AnnotatedLabel, W, Annotated
     def rec(tree: BinarizedTree[AnnotatedLabel]):BinarizedTree[AnnotatedLabel] = tree match {
       case t@UnaryTree(lbl1, child, chain, span) =>
         val newchild = rec(child)
-        if(newchild.label.hasAnnotation(DomCCLeft)) {
+        if (newchild.label.hasAnnotation(DomCCLeft)) {
           UnaryTree(lbl1.annotate(DomCCLeft), newchild, chain, span)
-        } else if(newchild.label.hasAnnotation(DomCCRight)) {
+        } else if (newchild.label.hasAnnotation(DomCCRight)) {
           UnaryTree(lbl1.annotate(DomCCRight), newchild, chain, span)
         } else {
           UnaryTree(lbl1, newchild, chain, span)
@@ -409,7 +395,7 @@ case class AnnotateDomCC[W]() extends TreeAnnotator[AnnotatedLabel, W, Annotated
         val newlc = rec(lc)
         val domsCCR = newrc.label.label == "CC" || (newrc.label.isIntermediate && newrc.label.hasAnnotation(DomCCRight))
         val domsCCL = newlc.label.label == "CC" || (newlc.label.isIntermediate && newlc.label.hasAnnotation(DomCCLeft))
-        val sym = if(domsCCL) lbl.annotate(DomCCLeft) else if(domsCCR) lbl.annotate(DomCCRight) else lbl
+        val sym = if (domsCCL) lbl.annotate(DomCCLeft) else if (domsCCR) lbl.annotate(DomCCRight) else lbl
         BinaryTree(sym, newlc, newrc, span)
       case _ => tree
     }
@@ -432,7 +418,6 @@ case class MarkNonIdentityUnaries[W]() extends TreeAnnotator[AnnotatedLabel, W, 
         else
           u.copy(child = rec(c))
     }
-
     rec(tree)
   }
 }
@@ -452,7 +437,6 @@ case class MarkExternalUnaries[W]() extends TreeAnnotator[AnnotatedLabel, W, Ann
        else
          u.copy(child=rec(c))
     }
-
     rec(tree)
   }
 }
@@ -468,7 +452,7 @@ case class FixRootLabelVerticalAnnotation[W]() extends TreeAnnotator[AnnotatedLa
       UnaryTree(label,
        c.relabelRoot(rootLabel => new AnnotatedLabel(rootLabel.label, rootLabel.headTag, (0 until 1).map(i => rootLabel.label), rootLabel.siblings, rootLabel.features)),
        chain,
-       span);
+       span)
     }
   }
 }
@@ -481,35 +465,34 @@ case class TagAnnotation() extends Annotation
 case class MarkPreterminals[W]() extends TreeAnnotator[AnnotatedLabel, W, AnnotatedLabel] {
   def apply(tree: BinarizedTree[AnnotatedLabel], words: Seq[W]) = {
     def rec(tree: BinarizedTree[AnnotatedLabel]):BinarizedTree[AnnotatedLabel] = tree match {
-      case b@BinaryTree(label, lc, rc, span) => BinaryTree(label, rec(lc), rec(rc), span);
-      case n@NullaryTree(label, span) => NullaryTree(label, span);
-      case u@UnaryTree(label, c, chain, span)  => {
+      case b@BinaryTree(label, lc, rc, span) => BinaryTree(label, rec(lc), rec(rc), span)
+      case n@NullaryTree(label, span) => NullaryTree(label, span)
+      case u@UnaryTree(label, c, chain, span) =>
         if (c.isLeaf) {
           UnaryTree(new AnnotatedLabel(label.label, label.headTag, label.parents, label.siblings, label.features ++ Set(new PreterminalAnnotation())),
                     c.relabelRoot(cLabel => new AnnotatedLabel(cLabel.label, cLabel.headTag, cLabel.parents, cLabel.siblings, cLabel.features ++ Set(new TagAnnotation()))),
                     chain,
-                    span);
+                    span)
         } else {
-          UnaryTree(label, rec(c), chain, span);
+          UnaryTree(label, rec(c), chain, span)
         }
-      }
     }
-    rec(tree);
+    rec(tree)
   }
 }
 
 trait MarkDominates[W] extends TreeAnnotator[AnnotatedLabel, W, AnnotatedLabel] {
-  protected def dominates(x: Tree[AnnotatedLabel]):Boolean
+  protected def dominates(x: Tree[AnnotatedLabel]): Boolean
   protected def sym: String
   def apply(tree: BinarizedTree[AnnotatedLabel], words: Seq[W]) = tree.extend { t =>
-    if(t eq tree) t.label
-    else if(dominates(t)) t.label.annotate(Dom(sym))
+    if (t eq tree) t.label
+    else if (dominates(t)) t.label.annotate(Dom(sym))
     else t.label
   }
 }
 
 case class DominatesV[W]() extends MarkDominates[W] {
-  protected def dominates(x: Tree[AnnotatedLabel]):Boolean = x.leaves.exists { t => t.label.label.startsWith("V") || t.label.label.startsWith("MD")}
+  protected def dominates(x: Tree[AnnotatedLabel]): Boolean = x.leaves.exists { t => t.label.label.startsWith("V") || t.label.label.startsWith("MD")}
   def sym = "V"
 }
 

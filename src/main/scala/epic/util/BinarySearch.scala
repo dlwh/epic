@@ -7,8 +7,8 @@ package epic.util
  **/
 object BinarySearch {
 
-  def interpolationSearch[T](objs: IndexedSeq[T], proj: T=>Int, toFind: Int):Int = {
-    if(objs.length == 0) return ~0
+  def interpolationSearch[T](objs: IndexedSeq[T], proj: T=>Int, toFind: Int): Int = {
+    if (objs.isEmpty) return ~0
 
     // Returns index of toFind in sortedArray, or -1 if not found
     var low = 0
@@ -17,7 +17,7 @@ object BinarySearch {
     var highV = proj(objs(high))
 
     while (lowV <= toFind && highV >= toFind) {
-      val mid = (if(highV == lowV) low else low + ((toFind - lowV.toLong) * (high - low)) / (highV.toLong - lowV.toLong)).toInt
+      val mid = (if (highV == lowV) low else low + ((toFind - lowV.toLong) * (high - low)) / (highV.toLong - lowV.toLong)).toInt
 
       val midV = proj(objs(mid))
       if (midV < toFind){
@@ -31,16 +31,13 @@ object BinarySearch {
       }
     }
 
-
     if (lowV == toFind) {
       low
-    } else if(lowV > toFind) {
+    } else if (lowV > toFind) {
       ~low
     } else {
       ~(high + 1)
     }
   }
-
-
 
 }

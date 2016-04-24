@@ -1,6 +1,5 @@
 package epic.framework
 
-
 /**
  * Marker for the output of an evaluation routine.
  * @tparam R self type

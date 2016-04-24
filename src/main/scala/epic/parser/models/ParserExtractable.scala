@@ -36,11 +36,10 @@ trait ParserExtractable[L, W] {
   def extractParser(weights: DenseVector[Double])(implicit deb: Debinarizer[L]): Parser[L, W]
 }
 
-
 trait ParserExtractableModelFactory[L,W] {
   def make(train: IndexedSeq[TreeInstance[L, W]], topology: RuleTopology[L], lexicon: Lexicon[L, W], constraintsFactory: ChartConstraints.Factory[L, W]): MyModel
 
-  def readWeights(in: File):Counter[Feature, Double] = if(in != null && in.exists) {
+  def readWeights(in: File):Counter[Feature, Double] = if (in != null && in.exists) {
     try {
       val ctr = breeze.util.readObject[Counter[Feature, Double]](in)
       ctr
@@ -52,7 +51,6 @@ trait ParserExtractableModelFactory[L,W] {
   }
 
   type MyModel <: Model[TreeInstance[L,W]] with ParserExtractable[L,W]
-
 
   protected def extractBasicCounts[L, W](trees: IndexedSeq[TreeInstance[L, W]]): (Counter2[L, W, Double], Counter2[L, BinaryRule[L], Double], Counter2[L, UnaryRule[L], Double]) = {
     GenerativeParser.extractCounts(trees)

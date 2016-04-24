@@ -34,7 +34,6 @@ import epic.slab.Sentence
 class JavaWordTokenizer(locale: Locale) extends Tokenizer {
   def this() = this(Locale.getDefault)
 
-
   override def apply[In <: Sentence](slab: StringSlab[In]): StringSlab[In with Token] = {
     slab.addLayer[Token](slab.iterator[Sentence].flatMap { s =>
       val breaker = BreakIterator.getWordInstance(locale)

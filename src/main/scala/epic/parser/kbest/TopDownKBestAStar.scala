@@ -13,11 +13,10 @@ object TopDownKBestAStar {
   def apply[L, W](chart: RefinedChartMarginal[L, W], k: Int):IndexedSeq[(BinarizedTree[L], Double)] = {
     import chart._
     val root = chart.topology.rootIndex
-
     val kbestList = new ArrayBuffer[(BinarizedTree[L], Double)]()
     val queue = new mutable.PriorityQueue[TKAItem[(Int, Int)]]
     queue.enqueue(StartItem)
-    while(!queue.isEmpty && kbestList.size < k) {
+    while (queue.nonEmpty && kbestList.size < k) {
       queue.dequeue() match {
         case StartItem =>
           val begin = 0
@@ -40,7 +39,7 @@ object TopDownKBestAStar {
             val chain = topology.chain(r)
             val refB = anchoring.childRefinement(r, refR)
             val bScore = inside.bot.labelScore(begin, end, b, refB)
-            if(!bScore.isInfinite) {
+            if (!bScore.isInfinite) {
               val rScore = anchoring.scoreUnaryRule(begin, end, r, refR)
               val newWeight = weight - aScore + bScore + rScore
               val newParentLabel = (b,refB)
@@ -63,7 +62,7 @@ object TopDownKBestAStar {
           val end = zipper.end
           val aScore = inside.bot.labelScore(begin, end, root, rootRef)
 
-        val traceOn = (begin == 0 && end == 4)
+        val traceOn = begin == 0 && end == 4
           val spanScore = anchoring.scoreSpan(begin, end, root, rootRef)
           for {
             r <- topology.indexedBinaryRulesWithParent(root)
@@ -83,7 +82,7 @@ object TopDownKBestAStar {
               )
             assert(score <= aScore + 1E-4, score -> aScore)
             val newWeight = weight - aScore + score
-            if(!newWeight.isInfinite) {
+            if (!newWeight.isInfinite) {
               val newZipper = zipper.copy(BinaryTree(zipper.tree.label,
                 NullaryTree(b -> refB, Span(begin,split)),
                 NullaryTree(c -> refC, Span(split, end)), zipper.tree.span)).down.get
@@ -91,10 +90,7 @@ object TopDownKBestAStar {
               queue += TopItem(newZipper, newWeight)
             }
           }
-
-
       }
-
     }
     kbestList
   }
@@ -108,7 +104,6 @@ object TopDownKBestAStar {
   private case class TopItem[L](zipper: Zipper[L], weight: Double) extends TKAItem[L]
   private case class BotItem[L](zipper: Zipper[L], weight: Double) extends TKAItem[L]
   private case class CompleteTreeItem[L](tree: BinarizedTree[L], weight: Double) extends TKAItem[L]
-
 
 }
 

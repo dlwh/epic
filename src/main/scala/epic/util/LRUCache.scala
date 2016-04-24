@@ -1,6 +1,5 @@
 package epic.util
 
-
 import scala.reflect.ClassTag
 import scala.util.hashing.MurmurHash3
 
@@ -33,7 +32,6 @@ final class LRUCache[@specialized(Int, Long) K:ClassTag, V:ClassTag](size: Int, 
       occupied(pos) = -1
       onEvict(keys(pos), values(pos))
     }
-
   }
 
   def iterator: Iterator[(K, V)] = {
@@ -65,7 +63,7 @@ final class LRUCache[@specialized(Int, Long) K:ClassTag, V:ClassTag](size: Int, 
     values(pos) = v
   }
 
-  private def lookup(k: K):Int = {
+  private def lookup(k: K): Int = {
     val hc : Int = k.##
     val hh = MurmurHash3.mixLast(10891, hc).abs % keys.length
     val hh2 = MurmurHash3.mixLast(10909, hc).abs % keys.length

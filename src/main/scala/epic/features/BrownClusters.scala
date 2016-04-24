@@ -22,17 +22,14 @@ object BrownClusters {
     } yield {
       word -> cluster.intern
     }
-
     val map = pairs.toMap
     in.close()
-
     map
   }
 
   lazy val clusterIds = theClusters.values.toSet
 
-  def clusterFor(w: String, default:String = "00"):String = theClusters.getOrElse(w, default)
-
+  def clusterFor(w: String, default:String = "00"): String = theClusters.getOrElse(w, default)
 
   trait DSL {
     // Tkachenko and Simanovsky liked these values
@@ -41,14 +38,13 @@ object BrownClusters {
   }
 }
 
-
 case class BrownClusterFeature(f: String) extends Feature
 
 case class BrownClusterFeaturizer(lengths: Array[Int]) extends WordFeaturizer[String] with Serializable {
 
   def anchor(w: IndexedSeq[String]): WordFeatureAnchoring[String] = new WordFeatureAnchoring[String] {
     def featuresForWord(pos: Int): Array[Feature] = {
-      if(pos < 0 || pos >= words.length)
+      if (pos < 0 || pos >= words.length)
         Array(BoundaryFeature)
       else
         features(pos)
@@ -68,7 +64,7 @@ case class BrownClusterFeaturizer(lengths: Array[Int]) extends WordFeaturizer[St
   private val clusterFeatures = {
     BrownClusters.clusterIds
       .iterator
-      .map(k => k -> lengths.map(l => if(l > k.length) BrownClusterFeature(k) else BrownClusterFeature(k.substring(0, l))).toSet[Feature].toArray[Feature])
+      .map(k => k -> lengths.map(l => if (l > k.length) BrownClusterFeature(k) else BrownClusterFeature(k.substring(0, l))).toSet[Feature].toArray[Feature])
       .toMap
   }
 }

@@ -16,7 +16,6 @@ import epic.preprocess.TreebankTokenizer
 import epic.corpora.CONLLSequenceReader
 import epic.framework.Example
 
-
 /**
  *
  * @author dlwh
@@ -52,14 +51,13 @@ object SemiNerPipeline extends LazyLogging {
       instances.splitAt(instances.length * 9 / 10)
     }
 
-
     val gazetteer =  None//Gazetteer.ner("en")
 
     // build feature Index
     val model = new SegmentationModelFactory(gazetteer = gazetteer).makeModel(train)
     val obj = new ModelObjective(model, train, params.nthreads)
     val cached = new CachedBatchDiffFunction(obj)
-    if(params.checkGradient) {
+    if (params.checkGradient) {
       GradientTester.test(cached, obj.initialWeightVector(true), toString = {(x: Int) => model.featureIndex.get(x).toString})
     }
 
@@ -68,7 +66,7 @@ object SemiNerPipeline extends LazyLogging {
       println("Eval + " + (state.iter+1) + " " + SegmentationEval.eval(crf, test))
     }
 
-    val finalState = params.opt.iterations(cached, obj.initialWeightVector(randomize=false)).tee(state => if((state.iter +1) % params.iterPerEval == 0) eval(state)).take(params.opt.maxIterations).last
+    val finalState = params.opt.iterations(cached, obj.initialWeightVector(randomize=false)).tee(state => if ((state.iter +1) % params.iterPerEval == 0) eval(state)).take(params.opt.maxIterations).last
     eval(finalState)
 
     breeze.util.writeObject(params.modelOut, model.extractCRF(finalState.x))
@@ -76,8 +74,6 @@ object SemiNerPipeline extends LazyLogging {
   }
 
 }
-
-
 
 object SemiConllNerPipeline extends LazyLogging {
 
@@ -88,22 +84,22 @@ object SemiConllNerPipeline extends LazyLogging {
     val out = new ArrayBuffer[(String, Span)]()
     var start = labels.length
     var i = 0
-    while(i < labels.length) {
+    while (i < labels.length) {
       val l = labels(i)
       l(0) match {
         case 'O' =>
-          if(start < i)
+          if (start < i)
             out += (labels(start).replaceAll(".-","").intern -> Span(start, i))
-//          out += ("O".intern -> Span(i, i+1))
+            // out += ("O".intern -> Span(i, i+1))
           start = i + 1
         case 'B' =>
-          if(start < i)
+          if (start < i)
             out += (labels(start).replaceAll(".-","").intern -> Span(start, i))
           start = i
         case 'I' =>
-          if(start >= i) {
+          if (start >= i) {
             start = i
-          } else if(labels(start) != l){
+          } else if (labels(start) != l){
             out += (labels(start).replaceAll(".-","").intern -> Span(start, i))
             start = i
           } // else, still in a field, do nothing.
@@ -113,14 +109,12 @@ object SemiConllNerPipeline extends LazyLogging {
 
       i += 1
     }
-    if(start < i)
+    if (start < i)
       out += (labels(start).replaceAll(".-","").intern -> Span(start, i))
 
-//    assert(out.nonEmpty && out.last._2.end == words.length, out + " " + words + " " + labels)
+    // assert(out.nonEmpty && out.last._2.end == words.length, out + " " + words + " " + labels)
     Segmentation(out, words, ex.id)
   }
-
-
 
   case class Params(train: File,
                     test: File,
@@ -141,13 +135,12 @@ object SemiConllNerPipeline extends LazyLogging {
       standardTrain.take(params.nsents).map(makeSegmentation) -> standardTest.map(makeSegmentation)
     }
 
-
     // build feature Index
     val model: SemiCRFModel[String, String] = new SegmentationModelFactory(/*, gazetteer = Gazetteer.ner("en" )*/).makeModel(train)
     val obj = new ModelObjective(model, train, params.nthreads)
     val cached = new CachedBatchDiffFunction(obj)
 
-    if(params.checkGradient) {
+    if (params.checkGradient) {
       GradientTester.test(cached, obj.initialWeightVector(true), toString={(i: Int) => model.featureIndex.get(i).toString})
     }
 
@@ -163,11 +156,10 @@ object SemiConllNerPipeline extends LazyLogging {
       stats
     }
 
-    val weights = params.opt.iterations(cached, obj.initialWeightVector(randomize=false)).tee(state => if((state.iter +1) % params.iterPerEval == 0) eval(state)).take(params.opt.maxIterations).last
+    val weights = params.opt.iterations(cached, obj.initialWeightVector(randomize=false)).tee(state => if ((state.iter +1) % params.iterPerEval == 0) eval(state)).take(params.opt.maxIterations).last
     val stats = eval(weights)
     breeze.util.writeObject(params.modelOut, model.extractCRF(weights.x))
     println(stats)
-
 
   }
 

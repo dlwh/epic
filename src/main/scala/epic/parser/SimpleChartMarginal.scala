@@ -26,18 +26,18 @@ final case class SimpleChartMarginal[L, L2, W](anchoring: SimpleGrammar.Anchorin
   }
 
   override def feasibleSplitPoints(begin: Int, end: Int, leftChild: Int, leftChildRef: Int, rightChild: Int, rightChildRef: Int): IndexedSeq[Int] = {
-    (begin + 1) until (end)
+    (begin + 1) until end
   }
 
   override def visitPostorder(spanVisitor: AnchoredVisitor[L], spanThreshold: Double): Unit = {
-    if(logPartition.isInfinite) throw new RuntimeException("No parse for " + words)
-    if(logPartition.isNaN) throw new RuntimeException("NaN prob!")
+    if (logPartition.isInfinite) throw new RuntimeException("No parse for " + words)
+    if (logPartition.isNaN) throw new RuntimeException("NaN prob!")
 
     val refinedTopology = anchoring.refinedTopology
 
     val lexLoc = anchoring.lexicon.anchor(anchoring.words)
     // handle lexical
-    for (i <- 0 until words.length) {
+    for (i <- words.indices) {
       var visitedSomething  = false
       for {
         a <- lexLoc.allowedTags(i)
@@ -62,20 +62,20 @@ final case class SimpleChartMarginal[L, L2, W](anchoring: SimpleGrammar.Anchorin
       val end = begin + span
       val aOutside = outside.bot(begin, end, parent)
       val labelMarginal = inside.bot(begin, end, parent) + aOutside - logPartition
-      if(labelMarginal > spanThreshold) {
+      if (labelMarginal > spanThreshold) {
         val aCoarse = anchoring.refinements.labels.project(parent)
         val aRef = anchoring.refinements.labels.localize(parent)
         spanVisitor.visitSpan(begin, end, aCoarse, aRef, math.exp(labelMarginal))
-        if(!spanVisitor.skipBinaryRules) {
+        if (!spanVisitor.skipBinaryRules) {
           val rules = anchoring.refinedTopology.indexedBinaryRulesWithParent(parent)
           var i = 0
-          while(i < rules.length) {
+          while (i < rules.length) {
             val r = rules(i)
             val b = refinedTopology.leftChild(r)
             val c = refinedTopology.rightChild(r)
 
             var split = begin + 1
-            while(split < end) {
+            while (split < end) {
               val bInside = inside.top.labelScore(begin, split, b)
               val cInside = inside.top.labelScore(split, end, c)
               val ruleScore = anchoring.grammar.ruleScore(r)
@@ -85,7 +85,7 @@ final case class SimpleChartMarginal[L, L2, W](anchoring: SimpleGrammar.Anchorin
 
               val margScore = bInside + cInside + ruleScore + aOutside - logPartition
 
-              if(margScore != Double.NegativeInfinity) {
+              if (margScore != Double.NegativeInfinity) {
                 spanVisitor.visitBinaryRule(begin, split, end, coarseR, refR, math.exp(margScore))
               }
 
@@ -100,7 +100,7 @@ final case class SimpleChartMarginal[L, L2, W](anchoring: SimpleGrammar.Anchorin
       }
     }
 
-    if(!spanVisitor.skipUnaryRules)
+    if (!spanVisitor.skipUnaryRules)
       for {
         span <- 1 to words.length
         begin <- 0 to (words.length - span)
@@ -136,7 +136,7 @@ object SimpleChartMarginal  {
   }
 
   def apply[L, L2, W](anchoring: SimpleGrammar.Anchoring[L, L2, W], maxMarginal: Boolean): SimpleChartMarginal[L, L2, W] = {
-    val sum = if(maxMarginal) MaxSummer else LogSummer
+    val sum = if (maxMarginal) MaxSummer else LogSummer
     val inside = buildInsideChart(anchoring, sum)
     val outside = buildOutsideChart(anchoring, inside, sum)
     SimpleChartMarginal(anchoring, inside, outside, maxMarginal)
@@ -188,24 +188,23 @@ object SimpleChartMarginal  {
         val rdoff = rcell.offset
 
         var lc = 0
-        while(lc < numSyms) {
+        while (lc < numSyms) {
           val lcSpan = tensor.leftChildRange(lc)
           var rcOff = lcSpan.begin
           val rcEnd = lcSpan.end
           val bInside = ldata(ldoff + lc)
-          if(bInside != Double.NegativeInfinity) {
-            while(rcOff < rcEnd) {
+          if (bInside != Double.NegativeInfinity) {
+            while (rcOff < rcEnd) {
               val rc = tensor.rightChildForOffset(rcOff)
               val cInside = rdata(rdoff + rc)
 
               val rcSpan = tensor.rightChildRange(rcOff)
               val withoutRule = bInside + cInside
 
-
-              if(cInside != Double.NegativeInfinity) {
+              if (cInside != Double.NegativeInfinity) {
                 var pOff = rcSpan.begin
                 val pEnd = rcSpan.end
-                while(pOff < pEnd) {
+                while (pOff < pEnd) {
                   val p = tensor.parentForOffset(pOff)
                   val score = tensor.ruleScoreForOffset(pOff) + withoutRule
                   pdata(p + pdoff) = sum(pdata(p + pdoff), score)
@@ -214,8 +213,6 @@ object SimpleChartMarginal  {
                 }
 
               }
-
-
 
               rcOff += 1
             }
@@ -227,7 +224,6 @@ object SimpleChartMarginal  {
 
         split += 1
       }
-
 
       updateInsideUnaries(chart, anchoring,  begin, end, sum)
     }
@@ -246,7 +242,7 @@ object SimpleChartMarginal  {
     val numSyms = tensor.numLeftChildren
 
     for {
-      span <- (length) until 0 by (-1)
+      span <- length until 0 by (-1)
       begin <- 0 to (length-span)
     } {
       val end = begin + span
@@ -257,7 +253,7 @@ object SimpleChartMarginal  {
       val pdoff = pcell.offset
 
       var a = 0
-      while(a < numSyms) {
+      while (a < numSyms) {
         val outsideA = pdata(pdoff + a)
         if (outsideA != Double.NegativeInfinity) {
           val pSpan = tensor.leftChildRange(a)
@@ -280,23 +276,23 @@ object SimpleChartMarginal  {
             val ordoff = orcell.offset
 
             var lcOff = pSpan.begin
-            while(lcOff < lcEnd) {
+            while (lcOff < lcEnd) {
               val lc = tensor.rightChildForOffset(lcOff)
               val bInside = ldata(ldoff + lc)
-              if(bInside != Double.NegativeInfinity) {
+              if (bInside != Double.NegativeInfinity) {
                 val lcSpan = tensor.rightChildRange(lcOff)
                 var rcOff = lcSpan.begin
                 val rcEnd = lcSpan.end
 
-                while(rcOff < rcEnd) {
+                while (rcOff < rcEnd) {
                   val rc = tensor.parentForOffset(rcOff)
                   val score = tensor.ruleScoreForOffset(rcOff) + outsideA
                   val cInside = rdata(rdoff + rc)
                   if (cInside != Double.NegativeInfinity) {
                     oldata(oldoff + lc) = sum(oldata(oldoff + lc), cInside + score)
                     ordata(ordoff + rc) = sum(ordata(ordoff + rc), bInside + score)
-//                    outside.top.enter(begin, split, lc, sum(outside.top.labelScore(begin, split, lc), cInside + score))
-//                    outside.top.enter(split, end, rc, sum(outside.top.labelScore(split, end, rc), bInside + score))
+                    // outside.top.enter(begin, split, lc, sum(outside.top.labelScore(begin, split, lc), cInside + score))
+                    // outside.top.enter(split, end, rc, sum(outside.top.labelScore(split, end, rc), bInside + score))
                   }
                   rcOff += 1
                 }
@@ -312,7 +308,6 @@ object SimpleChartMarginal  {
     outside
   }
 
-
   private def updateInsideUnaries[L, L2, W](chart: SimpleParseChart[L2],
                                         anchoring: SimpleGrammar.Anchoring[L, L2, W],
                                         begin: Int, end: Int, sum: Summer) = {
@@ -320,9 +315,7 @@ object SimpleChartMarginal  {
     val parentCell = chart.top.cell(begin, end)
     val tensor = anchoring.grammar.insideTensor
     doMatrixMultiply(childCell, parentCell, tensor, sum)
-
   }
-
 
   private def doMatrixMultiply[W, L2, L](childCell: DenseVector[Double], parentCell: DenseVector[Double], tensor: SparseRuleTensor[L2], sum: RefinedChartMarginal.Summer) {
     val numSyms = childCell.size
@@ -345,7 +338,6 @@ object SimpleChartMarginal  {
           aOff += 1
         }
       }
-
       b += 1
     }
   }
@@ -357,7 +349,6 @@ object SimpleChartMarginal  {
     val parentCell = outside.top.cell(begin, end)
     val tensor = anchoring.grammar.outsideTensor
     doMatrixMultiply(parentCell, childCell, tensor, sum)
-
   }
 
   case class SimpleChartFactory[L, L2, W](refinedGrammar: SimpleGrammar[L, L2, W], maxMarginal: Boolean = false) extends ParseMarginal.Factory[L, W] {
@@ -367,8 +358,6 @@ object SimpleChartMarginal  {
   }
 
 }
-
-
 
 @SerialVersionUID(1)
 final class SimpleParseChart[L](val index: Index[L], val length: Int) extends Serializable {
@@ -386,7 +375,6 @@ final class SimpleParseChart[L](val index: Index[L], val length: Int) extends Se
       //scores(::, TriangularArray.index(begin, end))
     }
 
-
     def apply(begin: Int, end: Int, label: L):Double = apply(begin, end, index(label))
     def labelScore(begin: Int, end: Int, label: L):Double = apply(begin, end, index(label))
 
@@ -397,6 +385,3 @@ final class SimpleParseChart[L](val index: Index[L], val length: Int) extends Se
   }
 
 }
-
-
-

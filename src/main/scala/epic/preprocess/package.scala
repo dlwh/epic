@@ -11,7 +11,7 @@ import java.net.URL
 package object preprocess {
   def tokenize(sentence: String): IndexedSeq[String] = TreebankTokenizer(sentence)
 
-  def loadContent(url: URL):String = TextExtractor.extractText(url)
+  def loadContent(url: URL): String = TextExtractor.extractText(url)
   
   def preprocess(url: URL):IndexedSeq[IndexedSeq[String]] = {
     preprocess(loadContent(url))
@@ -24,7 +24,6 @@ package object preprocess {
   def preprocess(file: File): IndexedSeq[IndexedSeq[String]] = {
     preprocess(file.toURI.toURL)
   }
-
 
   private lazy val _seg = MLSentenceSegmenter.bundled().get
 

@@ -83,7 +83,6 @@ object CRF {
     buildSimple(fixedData, false, gazetteer, opt = opt)
   }
 
-
   trait Anchoring[L, W] extends TagConstraints[L] {
     def words : IndexedSeq[W]
     def length: Int = words.length
@@ -91,7 +90,6 @@ object CRF {
     def labelIndex: Index[L]
     def startSymbol: L
     def validSymbols(pos: Int): Set[Int]
-
 
     override def allowedTags(pos: Int): Set[Int] = validSymbols(pos)
 
@@ -103,7 +101,6 @@ object CRF {
       }
     }
   }
-
 
   trait Marginal[L, W] extends VisitableMarginal[TransitionVisitor[L, W]] {
 
@@ -125,14 +122,13 @@ object CRF {
       var prev = 0
       val numLabels: Int = anchoring.labelIndex.size
       var sum = 0.0
-      while(prev <  numLabels) {
+      while (prev <  numLabels) {
         sum += transitionMarginal(pos, prev, label)
         prev += 1
       }
       sum
     }
   }
-
 
   object Marginal {
 
@@ -142,7 +138,6 @@ object CRF {
       val backwardScore: Array[Array[Double]] = this.backwardScores(scorer)
       val partition = softmax(forwardScores.last)
       val _s = scorer
-
 
       new Marginal[L, W] {
 
@@ -154,11 +149,11 @@ object CRF {
           while (pos < length) {
             var label = 0
             while (label < numLabels) {
-              if(!backwardScore(pos+1)(label).isInfinite) {
+              if (!backwardScore(pos+1)(label).isInfinite) {
                 var prevLabel = 0
                 while (prevLabel < numLabels) {
                   val score = transitionMarginal(pos, prevLabel, label)
-                  if(score != 0.0)
+                  if (score != 0.0)
                     f(pos, prevLabel, label,  score)
                   prevLabel += 1
                 }
@@ -170,23 +165,18 @@ object CRF {
 
         }
 
-
         /** Log-normalized probability of seing segment with transition */
         def transitionMarginal(pos: Int, prev: Int, cur: Int): Double = {
           val withoutTrans = forwardScores(pos)(prev) + backwardScore(pos+1)(cur)
-          if(withoutTrans.isInfinite) 0.0
+          if (withoutTrans.isInfinite) 0.0
           else math.exp(withoutTrans + anchoring.scoreTransition(pos, prev, cur) - logPartition)
         }
-
-
 
         def logPartition: Double = partition
 //        println(words + " " + partition)
       }
 
     }
-
-
 
     def goldMarginal[L, W](scorer: Anchoring[L, W], tags: IndexedSeq[L]):Marginal[L, W] = {
       var lastSymbol = scorer.labelIndex(scorer.startSymbol)
@@ -220,13 +210,9 @@ object CRF {
           numerics.I(prev == indexedSymbols(pos) && cur == indexedSymbols(pos + 1))
         }
 
-
         def logPartition: Double = score
       }
     }
-
-
-
 
     /**
      *
@@ -247,19 +233,16 @@ object CRF {
         val cur = forwardScores(i+1)
         for ( next <- scorer.validSymbols(i)) {
           var offset = 0
-          for ( previous <- if(i == 0) IndexedSeq(scorer.labelIndex(scorer.startSymbol)) else scorer.validSymbols(i-1)) {
+          for ( previous <- if (i == 0) IndexedSeq(scorer.labelIndex(scorer.startSymbol)) else scorer.validSymbols(i-1)) {
             val score = scorer.scoreTransition(i, previous, next) + forwardScores(i)(previous)
-            if(score != Double.NegativeInfinity) {
+            if (score != Double.NegativeInfinity) {
               cache(offset) = score
               offset += 1
             }
           }
           cur(next) = softmax.array(cache, offset)
         }
-
-
       }
-
 
       forwardScores
     }
@@ -288,23 +271,19 @@ object CRF {
           for( next <- scorer.validSymbols(i)) {
             val nextScore = backwardScores(i+1)(next)
             val score = scorer.scoreTransition(i, curLabel, next) + nextScore
-            if(score != Double.NegativeInfinity) {
+            if (score != Double.NegativeInfinity) {
               accumArray(offset) = score
               offset += 1
             }
           }
           cur(curLabel) = softmax(new DenseVector(accumArray, 0, 1, offset))
-
         }
       }
 
       backwardScores
     }
 
-
-
   }
-
 
   trait TransitionVisitor[L, W] {
     def apply(pos: Int, prev: Int, cur: Int, count: Double)
@@ -312,9 +291,7 @@ object CRF {
 
   trait IndexedFeaturizer[L, W] {
     def anchor(w: IndexedSeq[W]):AnchoredFeaturizer[L, W]
-
     def startSymbol: L
-
     def labelIndex: Index[L]
     def featureIndex: Index[Feature]
   }
@@ -325,7 +302,6 @@ object CRF {
     def validSymbols(pos: Int):Set[Int]
   }
 
-
   def viterbi[L, W](scorer: Anchoring[L ,W], id: String=""):TaggedSequence[L, W] = {
     val length = scorer.length
     val numLabels = scorer.labelIndex.size
@@ -333,7 +309,6 @@ object CRF {
     val forwardScores = Array.fill(length+1, numLabels)(Double.NegativeInfinity)
     forwardScores(0)(scorer.labelIndex(scorer.startSymbol)) = 0.0
     val backPointer = Array.fill(length, numLabels)(-1)
-
 
     // forward
     for(i <- 0 until length) {
@@ -345,7 +320,7 @@ object CRF {
 
         for ( previous <- scorer.validSymbols(i-1)) {
           val score = scorer.scoreTransition(i, previous, next) + forwardScores(i)(previous)
-          if(score > currentMax) {
+          if (score > currentMax) {
             currentMax = score
             currentArgMax = previous
           }
@@ -361,29 +336,27 @@ object CRF {
 
     def rec(end: Int, label: Int) {
       tags += scorer.labelIndex.get(label)
-      if(end > 0) {
+      if (end > 0) {
         val bestCurrentLabel = backPointer(end)(label)
         rec(end-1, bestCurrentLabel)
       }
-
     }
+
     rec(length-1, (0 until numLabels).maxBy(forwardScores(length)(_)))
     assert(tags.length == scorer.words.length, tags.reverse + " " + scorer.words)
 
     TaggedSequence(tags.reverse, scorer.words, id)
   }
 
-
   def posteriorDecode[L, W](m: Marginal[L, W], id: String = "") = {
     val length = m.length
     val labels = (0 until length).map(pos => (0 until m.anchoring.labelIndex.size).maxBy(m.positionMarginal(pos, _)))
-
     TaggedSequence(labels.map(m.anchoring.labelIndex.get), m.words, id)
   }
 
   case class ProductAnchoring[L, W](a: Anchoring[L ,W], b: Anchoring[L, W]) extends Anchoring[L, W] {
-    if((a.labelIndex ne b.labelIndex) && (a.labelIndex != b.labelIndex)) throw new IllegalArgumentException("Elements of product anchoring must have the same labelIndex!")
-    if(a.startSymbol != b.startSymbol) throw new IllegalArgumentException("Elements of product anchoring must have the same startSymbol!")
+    if ((a.labelIndex ne b.labelIndex) && (a.labelIndex != b.labelIndex)) throw new IllegalArgumentException("Elements of product anchoring must have the same labelIndex!")
+    if (a.startSymbol != b.startSymbol) throw new IllegalArgumentException("Elements of product anchoring must have the same startSymbol!")
 
     def words: IndexedSeq[W] = a.words
 
@@ -402,11 +375,9 @@ object CRF {
 
   class IdentityAnchoring[L, W](val words: IndexedSeq[W], val validSyms: IndexedSeq[Set[Int]], val labelIndex: Index[L], val startSymbol: L) extends Anchoring[L, W] {
     def scoreTransition(pos: Int, prev: Int, cur: Int): Double = 0.0
-
-
     def validSymbols(pos: Int): Set[Int] = validSyms(pos)
-
     def canStartLongSegment(pos: Int): Boolean = true
   }
+
 }
 

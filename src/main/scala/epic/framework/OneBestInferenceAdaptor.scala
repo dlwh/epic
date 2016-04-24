@@ -12,12 +12,9 @@ class OneBestInferenceAdaptor[Datum](val inference: AnnotatingInference[Datum]) 
   type Marginal = inference.Marginal
   type Scorer = inference.Scorer
 
-
-
   def scorer(v: Datum): Scorer = inference.scorer(v)
 
   def goldMarginal(scorer: Scorer, v: Datum): Marginal = inference.goldMarginal(scorer, v)
-
 
   /**
    * Produces the "guess marginal" which is the marginal conditioned on only the input data
@@ -29,9 +26,7 @@ class OneBestInferenceAdaptor[Datum](val inference: AnnotatingInference[Datum]) 
     goldMarginal(scorer, inference.annotate(v, m))
   }
 
-
 }
-
 
 class OneBestModelAdaptor[Datum](val model: Model[Datum] { type Inference <: AnnotatingInference[Datum]}) extends Model[Datum] {
   type ExpectedCounts = model.ExpectedCounts
@@ -39,7 +34,6 @@ class OneBestModelAdaptor[Datum](val model: Model[Datum] { type Inference <: Ann
   type Scorer = model.Scorer
   type Inference = OneBestInferenceAdaptor[Datum] { type Marginal = model.Marginal; type Scorer = model.Scorer}
   def emptyCounts: ExpectedCounts = model.emptyCounts
-
 
   def accumulateCounts(inf: Inference, s: Scorer, d: Datum, m: Marginal, accum: ExpectedCounts, scale: Double) {
     model.accumulateCounts(inf.inference.asInstanceOf[model.Inference], s, d, m, accum, scale)

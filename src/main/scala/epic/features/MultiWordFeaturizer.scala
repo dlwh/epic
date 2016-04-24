@@ -13,7 +13,6 @@ case class MultiWordFeaturizer[W](featurizers: IndexedSeq[WordFeaturizer[W]]) ex
   def anchor(w: IndexedSeq[W]): WordFeatureAnchoring[W] = new WordFeatureAnchoring[W] {
     val anchs = featurizers.map(_.anchor(w)).toArray
     def words: IndexedSeq[W] = w
-
     def featuresForWord(pos: Int): Array[Feature] = anchs.flatMap(_.featuresForWord(pos))
   }
 }

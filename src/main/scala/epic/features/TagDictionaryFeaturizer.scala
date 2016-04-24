@@ -18,7 +18,7 @@ class TagDictionaryFeaturizer[L](counts: Counter2[L, String, Double], commonWord
   private val emptyArray = Array.empty[Feature]
   private val argmaxes = Encoder.fromIndex(wordIndex).tabulateArray{w =>
     val totalCount = sum(counts(::, w))
-    if(totalCount >= commonWordThreshold) {
+    if (totalCount >= commonWordThreshold) {
       emptyArray
     } else if (totalCount <= 2)  {
       emptyArray
@@ -29,16 +29,16 @@ class TagDictionaryFeaturizer[L](counts: Counter2[L, String, Double], commonWord
   }
   private val variants = Encoder.fromIndex(wordIndex).tabulateArray{w =>
     val totalCount = sum(counts(::, w))
-    if(totalCount < commonWordThreshold) {
+    if (totalCount < commonWordThreshold) {
       variantFeatures(w)
     } else emptyArray
   }
 
   private def variantFeatures(w: String) = {
     val arr = mutable.ArrayBuilder.make[Feature]
-    if(w(0).isUpper) {
+    if (w(0).isUpper) {
       val lowerCount = sum(counts(::, w.toLowerCase))
-      if(lowerCount != 0.0) {
+      if (lowerCount != 0.0) {
         arr += HasKnownLowerCaseVariant(counts(::, w.toLowerCase).argmax)
       }
     }
@@ -47,24 +47,23 @@ class TagDictionaryFeaturizer[L](counts: Counter2[L, String, Double], commonWord
     if (dashIndex >= 0) {
       val afterDash = w.substring(dashIndex)
       val undashedCount = sum(counts(::, afterDash))
-      if(undashedCount != 0.0) {
+      if (undashedCount != 0.0) {
         arr += HasKnownAfterDashSuffix(counts(::, afterDash).argmax)
       }
     }
     arr.result()
   }
 
-
   def anchor(w: IndexedSeq[String]): WordFeatureAnchoring[String] = new WordFeatureAnchoring[String] {
     val indices = w.map(wordIndex)
     val myArgmaxes = indices.map{i =>
-      if(i < 0) {
+      if (i < 0) {
         emptyArray
       } else argmaxes(i)
     }
 
     val variants: IndexedSeq[Array[Feature]] = indices.zipWithIndex.map{ case(i, pos) =>
-      if(i < 0) {
+      if (i < 0) {
         variantFeatures(w(pos))
       } else {
         TagDictionaryFeaturizer.this.variants(i)
@@ -72,11 +71,11 @@ class TagDictionaryFeaturizer[L](counts: Counter2[L, String, Double], commonWord
     }
 
     def featuresForWord(pos: Int): Array[Feature] = {
-      if(pos < 0 || pos >= w.length) {
+      if (pos < 0 || pos >= w.length) {
         Array(IndicatorWSFeature('OutOfBounds))
       } else {
         val am = myArgmaxes(pos)
-        if(variants(pos).length != 0) {
+        if (variants(pos).length != 0) {
           am ++ variants(pos)
         } else {
           am

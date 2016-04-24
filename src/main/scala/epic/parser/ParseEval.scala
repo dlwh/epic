@@ -15,7 +15,6 @@ package epic.parser
  limitations under the License.
 */
 
-
 import epic.trees._
 import java.io.BufferedOutputStream
 import java.io.File
@@ -28,7 +27,6 @@ import concurrent.forkjoin.ForkJoinPool
 import com.typesafe.scalalogging.slf4j.LazyLogging
 import java.text.DecimalFormat
 import epic.util.ProgressLog
-
 
 /**
 * Hack approximation to true parse eval. Gives Labeled Precision
@@ -43,24 +41,21 @@ class ParseEval[L](ignoredLabels: Set[L]) {
   * guess/gold pair of trees.
   */
   def apply(guessgold: Iterator[(Tree[L],Tree[L])]):Statistics = {
-    val allStats = for( (guess,gold) <- guessgold) yield { apply(guess,gold) }
-
+    val allStats = for((guess,gold) <- guessgold) yield { apply(guess,gold) }
     val stats = allStats.reduceLeft(_ + _)
-
     stats
   }
 
   def apply(guess: Tree[L], gold: Tree[L]): Statistics = {
     val guessSet = labeledConstituents(guess)
     val goldSet = labeledConstituents(gold)
-    val inter = (guessSet intersect goldSet)
-    val exact = if(goldSet.size == inter.size && guessSet.size == inter.size) 1 else 0
+    val inter = guessSet intersect goldSet
+    val exact = if (goldSet.size == inter.size && guessSet.size == inter.size) 1 else 0
     val guessLeaves = guess.leaves
     val goldLeaves = gold.leaves
-    val numRight = goldLeaves.zip(guessLeaves).foldLeft(0) { (acc,gg) => if(gg._1.label == gg._2.label) acc + 1 else acc}
+    val numRight = goldLeaves.zip(guessLeaves).foldLeft(0) { (acc,gg) => if (gg._1.label == gg._2.label) acc + 1 else acc}
     Statistics(guessSet.size, goldSet.size, inter.size, exact, numRight, guess.span.end, 1)
   }
-
 
   private def labeledConstituents(tree: Tree[L]) = Set() ++ {
     for(child <- tree.preorder
@@ -84,9 +79,9 @@ object ParseEval extends LazyLogging {
         numParses + stats.numParses)
     }
 
-    def precision = if(guess == 0) 1.0 else (right * 1.0 / guess)
-    def recall = if(guess == 0) 1.0 else (right * 1.0 / gold)
-    def exact = (numExact * 1.0 / numParses)
+    def precision = if (guess == 0) 1.0 else right * 1.0 / guess
+    def recall = if (guess == 0) 1.0 else right * 1.0 / gold
+    def exact = numExact * 1.0 / numParses
     def tagAccuracy = tagsRight * 1.0 / numWords
     def f1 = (2 * precision * recall)/(precision + recall)
 
@@ -143,7 +138,7 @@ object ParseEval extends LazyLogging {
                      nthreads: Int = -1)(implicit deb: Debinarizer[L]) = {
 
     val parsedir = new File(evalDir)
-    if(!parsedir.exists() && !parsedir.mkdirs()) {
+    if (!parsedir.exists() && !parsedir.mkdirs()) {
       throw new RuntimeException("Couldn't make directory: " + parsedir)
     }
     val goldOut = new PrintStream(new BufferedOutputStream(new FileOutputStream(new File(parsedir,"gold"))))

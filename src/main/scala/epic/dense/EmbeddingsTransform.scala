@@ -23,7 +23,7 @@ case class EmbeddingsTransform[FV](numOutputs: Int,
   
   def extractLayer(weights: DenseVector[Double], forTrain: Boolean) = {
     val mat = weights(0 until (numOutputs * numInputs)).asDenseMatrix.reshape(numOutputs, numInputs, view = View.Require)
-    val bias = if(includeBias) {
+    val bias = if (includeBias) {
       weights(numOutputs * numInputs until index.indices(0).size)
     } else {
       DenseVector.zeros[Double](numOutputs)
@@ -69,8 +69,8 @@ case class EmbeddingsTransform[FV](numOutputs: Int,
 
     def activations(fv: Array[Int]) = {
       val finalVector = DenseVector.zeros[Double](numOutputs)
-      for (i <- 0 until fv.size) {
-//        val wordPosn = fv(i) -> i
+      fv.indices.foreach { i =>
+      // val wordPosn = fv(i) -> i
         if (fv(i) != -1) {
           caches(i).synchronized {
             if (!caches(i).contains(fv(i))) {
@@ -88,25 +88,23 @@ case class EmbeddingsTransform[FV](numOutputs: Int,
     def tallyDerivative(deriv: DenseVector[Double], _scale: =>Vector[Double], fv: Array[Int]) = {
       val scale = _scale
       val matDeriv = deriv(0 until (numOutputs * numInputs)).asDenseMatrix.reshape(numOutputs, numInputs, view = View.Require)
-      val biasDeriv = if(includeBias) {
+      val biasDeriv = if (includeBias) {
         deriv(numOutputs * numInputs until index.size)
       } else {
         DenseVector.zeros[Double](numOutputs)
       }
-
       // whole function is f(mat * inner(fv) + bias)
       // scale(i) pushes in  (f'(mat * inner(v) + bias))(i)
-      val innerAct = DenseVector(word2vecIndexed.convertToVector(fv)) + Word2VecSurfaceFeaturizerIndexed.makeVectFromParams(fv, wordWeights);
-      
+      val innerAct = DenseVector(word2vecIndexed.convertToVector(fv)) + Word2VecSurfaceFeaturizerIndexed.makeVectFromParams(fv, wordWeights)
       val wordsDeriv = deriv(index.indices(0).size until index.indices(0).size + index.indices(1).size).asDenseMatrix.reshape(word2vecIndexed.vocSize, word2vecIndexed.wordRepSize, view = View.Require)
-      val wordsDerivs = Array.tabulate(fv.size)(wordPosnIdx => wordsDeriv(fv(wordPosnIdx), ::).t)
+      val wordsDerivs = Array.tabulate(fv.length)(wordPosnIdx => wordsDeriv(fv(wordPosnIdx), ::).t)
       // d/d(weights(::, i)) == scale(i) * innerAct
       for (i <- 0 until weights.rows) {
         val a: Double = scale(i)
-        if(a != 0.0) {
+        if (a != 0.0) {
           axpy(a, innerAct, matDeriv.t(::, i))
-          var wordPosnIdx = 0;
-          while (wordPosnIdx < fv.size) {
+          var wordPosnIdx = 0
+          while (wordPosnIdx < fv.length) {
             val relevantWeights = weights(i, wordPosnIdx * word2vecIndexed.wordRepSize until (wordPosnIdx + 1) * word2vecIndexed.wordRepSize).t
             axpy(a, relevantWeights, wordsDerivs(wordPosnIdx))
             wordPosnIdx += 1
@@ -119,8 +117,7 @@ case class EmbeddingsTransform[FV](numOutputs: Int,
       // scale is f'(mat * inner(v) + bias)
       // d/dv is mat.t * f'(mat * inner(v) + bias)
     }
-    
-    
+
     def applyBatchNormalization(inputs: scala.collection.GenTraversable[Array[Int]]) = {}
   }
 }

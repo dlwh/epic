@@ -16,7 +16,6 @@ package epic.trees
  limitations under the License.
 */
 
-
 import java.io._
 
 import epic.ontonotes.ConllOntoReader
@@ -111,7 +110,7 @@ object Treebank {
   * of the parsed Treebank.
   */
   def fromPennTreebankDir(dir: File):Treebank[String] = new Treebank[String] {
-    if(!dir.exists) throw new FileNotFoundException(dir.toString)
+    if (!dir.exists) throw new FileNotFoundException(dir.toString)
     def sections = dir.listFiles.filter(_.isDirectory).map(_.getName)
     val train = Portion("train", IndexedSeq.range(2,10).map("0" + _) ++ IndexedSeq.range(10,22).map(""+_))
 
@@ -135,9 +134,9 @@ object Treebank {
 
   def fromChineseTreebankDir(dir: File):Treebank[String] = new Treebank[String] {
     def sections = dir.listFiles.map(_.getName)
-    private def id_to_name(id: Int) = s"chtb_${if(id < 100)  "0" + id else id}.mrg"
+    private def id_to_name(id: Int) = s"chtb_${if (id < 100)  "0" + id else id}.mrg"
 
-    val train = Portion("train",{(1 to 270) ++ (400 to 1151)} map(id_to_name))
+    val train = Portion("train",{(1 to 270) ++ (400 to 1151)} map id_to_name)
     val test = Portion("test", 271 to 300 map id_to_name)
     val dev = Portion("dev",301 to 325 map id_to_name)
 

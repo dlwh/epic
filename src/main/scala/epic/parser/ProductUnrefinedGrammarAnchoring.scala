@@ -27,7 +27,6 @@ final case class ProductUnrefinedGrammarAnchoring[L, W](s1: UnrefinedGrammarAnch
                                             s2: UnrefinedGrammarAnchoring[L, W],
                                             alpha: Double = 1.0) extends UnrefinedGrammarAnchoring[L, W] {
 
-
   //  def sparsityPattern = ChartConstraints.noSparsity[L]
   override def addConstraints(cs: ChartConstraints[L]): UnrefinedGrammarAnchoring[L, W] = copy(s1.addConstraints(cs))
 
@@ -39,9 +38,8 @@ final case class ProductUnrefinedGrammarAnchoring[L, W](s1: UnrefinedGrammarAnch
 
   def words = s1.words
 
-
-//  override val sparsityPattern: ChartConstraints[L] = s1.sparsityPattern & s2.sparsityPattern
-//  def addConstraints(cs: ChartConstraints[L]): CoreAnchoring[L, W] = new ProductCoreAnchoring(s1.addConstraints(cs), s2, alpha)
+  // override val sparsityPattern: ChartConstraints[L] = s1.sparsityPattern & s2.sparsityPattern
+  // def addConstraints(cs: ChartConstraints[L]): CoreAnchoring[L, W] = new ProductCoreAnchoring(s1.addConstraints(cs), s2, alpha)
 
   def scoreSpan(begin: Int, end: Int, label: Int) = {
     val r1 = s1.scoreSpan(begin, end, label)

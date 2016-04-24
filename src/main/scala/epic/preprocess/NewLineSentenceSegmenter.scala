@@ -19,14 +19,13 @@ class NewLineSentenceSegmenter(locale: Locale = Locale.getDefault) extends Sente
     val spans = new ArrayBuffer[(Span, Sentence)]()
 
     var start = 0
-    while(m.find()) {
+    while (m.find()) {
       val end = m.end()
-      if(end - start > 1)
+      if (end - start > 1)
         spans += (Span(start, end) -> Sentence())
       start = end
     }
     spans += Span(start, slab.content.length) -> Sentence()
-
 
     slab.addLayer[Sentence](spans)
   }
@@ -35,7 +34,7 @@ class NewLineSentenceSegmenter(locale: Locale = Locale.getDefault) extends Sente
 class SegmentingIterator(inner: BreakIterator, private var start: Int = 0, private val last: Int = -1) extends Iterator[Span] {
   private var end = inner.following(start)
 
-  def hasNext = (end != BreakIterator.DONE && (last == -1 || end <= last))
+  def hasNext = end != BreakIterator.DONE && (last == -1 || end <= last)
 
   def next = {
     val res = Span(start, end)

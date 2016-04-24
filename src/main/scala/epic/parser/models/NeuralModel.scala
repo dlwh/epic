@@ -40,8 +40,6 @@ You can also epic.trees.annotations.KMAnnotator to get more or less Klein and Ma
                     topology: RuleTopology[AnnotatedLabel],
                     lexicon: Lexicon[AnnotatedLabel, String], constrainer: Factory[AnnotatedLabel, String]): MyModel = {
 
-
-
     val annTrees: IndexedSeq[TreeInstance[AnnotatedLabel, String]] = trainTrees.map(annotator(_))
     println("Here's what the annotation looks like on the first few trees")
     annTrees.slice(0, Math.min(3, annTrees.size)).foreach(tree => println(tree.render(false)))
@@ -61,12 +59,10 @@ You can also epic.trees.annotations.KMAnnotator to get more or less Klein and Ma
 
     span += new SingleWordSpanFeaturizer[String](wf)
 
-
     val indexedSurface = IndexedSplitSpanFeaturizer.fromData(span, annTrees, bloomFilter = false)
 
-
     def labelFeaturizer(l: AnnotatedLabel) = Set(l, l.baseAnnotatedLabel).toSeq
-    def ruleFeaturizer(r: Rule[AnnotatedLabel]) = if(r.isInstanceOf[UnaryRule[AnnotatedLabel]]) Set(r.parent, r.parent.baseAnnotatedLabel).toSeq else Seq.empty
+    def ruleFeaturizer(r: Rule[AnnotatedLabel]) = if (r.isInstanceOf[UnaryRule[AnnotatedLabel]]) Set(r.parent, r.parent.baseAnnotatedLabel).toSeq else Seq.empty
 
     val featurizer = new ProductionFeaturizer[AnnotatedLabel, AnnotatedLabel, String](xbarGrammar, indexedRefinements,
       lGen=labelFeaturizer,
@@ -75,15 +71,18 @@ You can also epic.trees.annotations.KMAnnotator to get more or less Klein and Ma
     val transform = new AffineTransform(
       featurizer.index.size,
       numOutputs,
-      new TanhTransform(new AffineTransform(numOutputs, numHidden,
-        new TanhTransform[FeatureVector](numHidden, indexedSurface.featureIndex.size, true))))
+      new TanhTransform(
+        new AffineTransform(numOutputs, numHidden,
+        new TanhTransform[FeatureVector](numHidden, indexedSurface.featureIndex.size, true)))
+      )
 
-
-    new TransformModel(annotator.latent,
+    new TransformModel(
+      annotator.latent,
       constrainer,
       topology, lexicon,
       refGrammar, indexedRefinements,
       featurizer, indexedSurface,
-      transform)
+      transform
+    )
   }
 }
