@@ -24,10 +24,8 @@ class WhitespaceTokenizer() extends RegexSplitTokenizer("\\s+")
 
 object WhitespaceTokenizer {
   def apply() : WhitespaceTokenizer = new WhitespaceTokenizer
-
   private val _instance : WhitespaceTokenizer = apply()
   def apply(in : String) : Iterable[String] = _instance(in)
-
 }
 
 

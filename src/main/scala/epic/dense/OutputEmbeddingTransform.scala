@@ -17,7 +17,6 @@ import scala.util.Random
  */
 case class OutputEmbeddingTransform[FV](numOutputs: Int, outputDim: Int, innerTransform: Transform[FV, DenseVector[Double]], coarsenerForInitialization: Option[Int => Int] = None) extends OutputTransform[FV, DenseVector[Double]] {
 
-
   val index = SegmentedIndex(new AffineTransform.Index(numOutputs, outputDim, true),
                              innerTransform.index)
   

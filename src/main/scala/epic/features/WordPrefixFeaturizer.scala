@@ -20,7 +20,6 @@ import breeze.linalg._
 import collection.mutable.ArrayBuffer
 import breeze.util.{Encoder, Index}
 
-
 class WordPrefixFeaturizer(wordCounts: Counter[String, Double], prefixOrder: Int = 5, commonWordThreshold: Int = 100) extends WordFeaturizer[String] with Serializable {
 
   private val wordIndex = Index(wordCounts.keysIterator)
@@ -33,17 +32,16 @@ class WordPrefixFeaturizer(wordCounts: Counter[String, Double], prefixOrder: Int
     def featuresForWord(pos: Int): Array[Feature] = {
       myFeatures(pos)
     }
-
   }
 
   def featuresFor(w: String): Array[Feature] = {
     val wc = wordCounts(w)
-    if(wc > commonWordThreshold) {
+    if (wc > commonWordThreshold) {
       Array.empty
     } else {
       val features = new ArrayBuffer[Feature]
       val wlen = w.length
-      if(wlen >= 4) {
+      if (wlen >= 4) {
         for(i <- 1 to ((wlen - 1) min prefixOrder)) {
           features += PrefixFeature(w.substring(0,i))
         }
@@ -54,7 +52,6 @@ class WordPrefixFeaturizer(wordCounts: Counter[String, Double], prefixOrder: Int
   }
 
   def apply(w: String) = featuresFor(w)
-
 
 }
 

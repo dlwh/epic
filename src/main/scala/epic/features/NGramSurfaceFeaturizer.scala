@@ -6,7 +6,7 @@ import breeze.util.CachedHashCode
 import scala.runtime.ScalaRunTime
 
 case class OrientedNGramFeature(offset: Int, features: IndexedSeq[Feature]) extends Feature with CachedHashCode {
-  override def equals(other: Any):Boolean = other match {
+  override def equals(other: Any): Boolean = other match {
     case x: OrientedNGramFeature => x.hashCode == hashCode && ScalaRunTime._equals(this, x)
     case _ => false
   }
@@ -21,7 +21,6 @@ class NGramWordFeaturizer[W](base: WordFeaturizer[W], wordNgramOrder: Int = 2) e
     new WordFeatureAnchoring[W] {
       val baseAnch = base.anchor(w)
       def words: IndexedSeq[W] = w
-
 
       def featuresForWord(pos: Int): Array[Feature] = {
         val result = ArrayBuffer[Feature]() ++= baseAnch.featuresForWord(pos)
@@ -39,12 +38,10 @@ class NGramWordFeaturizer[W](base: WordFeaturizer[W], wordNgramOrder: Int = 2) e
       }
     }
 
-
   }
 
   private def allConfigurations(seqOfSeqs: TraversableOnce[Array[Feature]]): IndexedSeq[IndexedSeq[Feature]] = {
     seqOfSeqs.foldLeft(IndexedSeq(IndexedSeq.empty[Feature]))((acc,currentFeatures) => {for(a <- acc; b <- currentFeatures) yield a :+ b})
   }
-
 
 }

@@ -33,7 +33,6 @@ case class ComposedAnalysisFunction[C, B, I, O, II >: (I with O), +OO](a: Analys
 
 }
 
-
 object StringIdentityAnalyzer extends StringAnalysisFunction[Any, Any] {
   def apply[In](slab: StringSlab[In]):StringSlab[In] = slab
 }
@@ -49,7 +48,6 @@ object RegexTokenizer extends Tokenizer {
         Span(region.begin + m.start, region.begin + m.end) -> Token(m.group(0)))
     })
 }
-
 
 object AnalysisPipeline {
   import AnnotatedSpan._
@@ -81,6 +79,5 @@ object AnalysisPipeline {
     println("\nTOKENS\n\n" + tokens.map(r => slab.spanned(r._1)).mkString("\n\n"))
 
   }
-
 
 }

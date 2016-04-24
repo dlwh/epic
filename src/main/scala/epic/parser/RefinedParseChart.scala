@@ -48,14 +48,12 @@ class RefinedParseChart[L](val index: Index[L],
     /** (begin,end) -> label ->  refinement -> score */
     // fill in arrays for spans we might touch
     val score: TriangularArray[Array[Array[Double]]] = TriangularArray.tabulate(length+1){(begin, end) =>
-      if(sparsity.isAllowedSpan(begin, end)) {
+      if (sparsity.isAllowedSpan(begin, end)) {
         makeGrammarScoreArray(begin, end)
       } else {
         null
       }
     }
-
-
 
     /** (begin,end) -> which labels are on */
     val enteredLabels: Array[BitSet] = mkBitSetArray(TriangularArray.arraySize(length+1))
@@ -94,19 +92,19 @@ class RefinedParseChart[L](val index: Index[L],
 
     def enteredLabelScores(begin: Int, end: Int) = {
       val scoreArray = score(begin, end)
-      if(scoreArray eq null) Iterator.empty
+      if (scoreArray eq null) Iterator.empty
       else enteredLabels(TriangularArray.index(begin, end)).iterator.map { i => (index.get(i), scoreArray(i))}
     }
 
     def decodedLabelScores(begin: Int, end: Int):Counter2[L,Int,Double] = {
       val scoreArray = score(begin, end)
-      if(scoreArray eq null) Counter2()
+      if (scoreArray eq null) Counter2()
       else {
         val ret = Counter2[L, Int, Double]()
         for(i <- enteredLabels(TriangularArray.index(begin, end))) {
           val l = index.get(i)
           for((v,s) <- scoreArray(i).zipWithIndex) {
-            if(v != zero)
+            if (v != zero)
               ret(l,s) = v
           }
         }
@@ -116,17 +114,16 @@ class RefinedParseChart[L](val index: Index[L],
 
     def decodedLabelScores(begin: Int, end: Int, label: Int):Counter[Int,Double] = {
       val scoreArray = score(begin, end)
-      if(scoreArray == null || scoreArray(label) == null) Counter()
+      if (scoreArray == null || scoreArray(label) == null) Counter()
       else {
         val ret = Counter[Int, Double]()
         for((v,s) <- scoreArray(label).zipWithIndex) {
-          if(v != zero)
+          if (v != zero)
             ret(s) = v
         }
         ret
       }
     }
-
 
     private def rawEnter(begin: Int, end: Int, parent: Int, ref: Int, w: Double) = {
       val arrx = score(begin, end)
@@ -136,11 +133,10 @@ class RefinedParseChart[L](val index: Index[L],
       oldScore
     }
 
-
     def enter(begin: Int, end: Int, parent: Int, ref: Int, w: Double): Unit = {
       val oldScore =  rawEnter(begin, end, parent, ref, w)
 
-      if(oldScore == zero) {
+      if (oldScore == zero) {
         val index = TriangularArray.index(begin, end)
         updateExtents(index, parent, ref, begin, end)
       }
@@ -190,22 +186,19 @@ class RefinedParseChart[L](val index: Index[L],
       narrowR < end
     }
 
-
-
     def feasibleSplitPoints(begin: Int, end: Int, b: Int, c: Int) = {
       val narrowR = coarseLeftMostEndForBegin(begin)(b)
       val narrowL = coarseRightMostBeginForEnd(end)(c)
       var split = math.max(narrowR, coarseLeftMostBeginForEnd(end)(c))
       val endSplit = math.min(coarseRightMostEndForBegin(begin)(b), narrowL) + 1
       val canBuildThisRule = narrowR < end && narrowL >= narrowR && split <= narrowL && split < endSplit
-      if(!canBuildThisRule)
+      if (!canBuildThisRule)
         split = endSplit
-
       Span(split, endSplit)
     }
 
     def feasibleSplitPoints(begin: Int, end: Int, b: Int, refB: Int, c: Int, refC: Int) = {
-      if(leftMostEndForBegin(begin)(b) == null || rightMostBeginForEnd(end)(c) == null) {
+      if (leftMostEndForBegin(begin)(b) == null || rightMostBeginForEnd(end)(c) == null) {
         Span(0,0)
       } else {
         val narrowR = leftMostEndForBegin(begin)(b)(refB)
@@ -213,9 +206,8 @@ class RefinedParseChart[L](val index: Index[L],
         var split = math.max(narrowR, leftMostBeginForEnd(end)(c)(refC))
         val endSplit = math.min(rightMostEndForBegin(begin)(b)(refB), narrowL) + 1
         val canBuildThisRule = narrowR < end && narrowL >= narrowR && split <= narrowL && split < endSplit
-        if(!canBuildThisRule)
+        if (!canBuildThisRule)
           split = endSplit
-
         Span(split, endSplit)
       }
     }
@@ -227,7 +219,6 @@ class RefinedParseChart[L](val index: Index[L],
       }
       arr
     }
-
 
     private def makeGrammarScoreArray(begin: Int, end: Int): Array[Array[Double]] = {
       val arr = new Array[Array[Double]](index.size)
@@ -245,14 +236,11 @@ class RefinedParseChart[L](val index: Index[L],
   protected final def zero = Double.NegativeInfinity
 }
 
-
-
 object RefinedParseChart {
 
   def apply[L](g: Index[L], refinements: Array[Int], length: Int, constraints: ChartConstraints[L]): RefinedParseChart[L] = {
     new RefinedParseChart(g, refinements, length, constraints)
   }
-
 
   // all of these methods could be replaced by an Array.fill or Array.tabulate, but
   // those were showing up in the profile.
@@ -283,13 +271,12 @@ object RefinedParseChart {
     arr
   }
 
-
   private def makeRefinedExtentArray(len: Int, refinementsFor: Array[Int], fillValue: Int): Array[Array[Array[Int]]] = {
     val arr = Array.ofDim[Array[Int]](len, refinementsFor.length)
     var pos = 0
     while (pos < len) {
       var l = 0
-      while(l < refinementsFor.length) {
+      while (l < refinementsFor.length) {
         val myArr = new Array[Int](refinementsFor(l))
         util.Arrays.fill(myArr, fillValue)
         arr(pos)(l) = myArr

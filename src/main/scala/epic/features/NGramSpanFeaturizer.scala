@@ -29,14 +29,14 @@ class NGramSpanFeaturizer(wordCounts: Counter[String,Double],
   def anchor(words: IndexedSeq[String]): SurfaceFeatureAnchoring[String] = {
     new SurfaceFeatureAnchoring[String] {
       def featuresForSpan(begin: Int, end: Int): Array[Feature] = {
-//        println("Span: " + words.slice(begin, end))
+      // println("Span: " + words.slice(begin, end))
         val unigramFeats = for (i <- begin until end) yield {
-//          println(words(i) + ": " + wordCounts(words(i)))
+        // println(words(i) + ": " + wordCounts(words(i)))
           NGramUnigramFeature(if (wordCounts(words(i)) < ngramCountThreshold) -1 else wordIndex(words(i)))
         }
         val bigramFeats = for (i <- begin until end - 1) yield {
           val pair = (words(i), words(i+1))
-//          println(pair + ": " + bigramCounts(pair))
+          // println(pair + ": " + bigramCounts(pair))
           NGramBigramFeature(if (bigramCounts(pair) < ngramCountThreshold) -1 else bigramIndex(pair))
         }
         val notFeats = if (useNot) {
@@ -48,7 +48,7 @@ class NGramSpanFeaturizer(wordCounts: Counter[String,Double],
             } else if (NGramSpanFeaturizer.NotEndingPunc.contains(words(i))) {
               inNotSpan = false
             } else if (inNotSpan) {
-//              println(words.slice(begin, end) + " (not span): " + words(i))
+            // println(words.slice(begin, end) + " (not span): " + words(i))
               notFeats += NotFeature(if (wordCounts(words(i)) < ngramCountThreshold) -1 else wordIndex(words(i)))
             }
           }
@@ -60,7 +60,7 @@ class NGramSpanFeaturizer(wordCounts: Counter[String,Double],
           val ngramFeats = (3 to maxOrder).flatMap(n => {
             for (i <- begin until end - n + 1) yield {
               val slice = words.slice(i, i+n)
-//              println(slice + ": " + higherOrderCounts(n-3)(slice))
+              // println(slice + ": " + higherOrderCounts(n-3)(slice))
               NGramFeature(n, if (higherOrderCounts(n-3)(slice) < ngramCountThreshold) -1 else higherOrderIndices(n-3)(slice))
             }
           })

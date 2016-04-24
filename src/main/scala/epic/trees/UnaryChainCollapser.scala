@@ -30,12 +30,12 @@ object UnaryChainCollapser {
     def transform(t: BinarizedTree[AnnotatedLabel],parentWasUnary:Boolean):BinarizedTree[AnnotatedLabel] = t match {
       case UnaryTree(l,c, _chain, span) =>
         val (chain,cn) = stripChain(c)
-        UnaryTree(l,transform(cn,true), if(keepChains) _chain ++ chain.toIndexedSeq else IndexedSeq.empty, t.span)
+        UnaryTree(l,transform(cn,true), if (keepChains) _chain ++ chain.toIndexedSeq else IndexedSeq.empty, t.span)
       case BinaryTree(l,lchild,rchild, span) =>
-        if(parentWasUnary) BinaryTree(l,transform(lchild,false),transform(rchild,false), t.span)
+        if (parentWasUnary) BinaryTree(l,transform(lchild,false),transform(rchild,false), t.span)
         else UnaryTree(l,BinaryTree(l,transform(lchild,false),transform(rchild,false), t.span), IndexedSeq.empty, t.span)
       case NullaryTree(l, span) =>
-        if(parentWasUnary) NullaryTree(l, t.span)
+        if (parentWasUnary) NullaryTree(l, t.span)
         else UnaryTree(l,NullaryTree(l, t.span), IndexedSeq.empty, t.span)
       case t => t
     }

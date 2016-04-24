@@ -83,8 +83,8 @@ case class Frame(lemma: String, pos: Int, sense: Int, args: IndexedSeq[Argument]
     val newArgs = mutable.Stack[Argument]()
     val sorted = args.sortBy(a => (a.span.begin, -a.span.length))(Ordering.Tuple2)
     for(arg <- sorted) {
-      if(newArgs.isEmpty || !newArgs.top.span.contains(arg.span)) { // don't overlap at all
-        while(newArgs.nonEmpty && arg.span.contains(newArgs.top.span)) {
+      if (newArgs.isEmpty || !newArgs.top.span.contains(arg.span)) { // don't overlap at all
+        while (newArgs.nonEmpty && arg.span.contains(newArgs.top.span)) {
           newArgs.pop()
         }
         assert(newArgs.isEmpty || !arg.span.crosses(newArgs.top.span))
@@ -102,14 +102,14 @@ case class Frame(lemma: String, pos: Int, sense: Int, args: IndexedSeq[Argument]
     var last = 0
     for( arg <- sorted ) {
       assert(last <= arg.span.begin)
-      while(arg.span.begin != last) {
+      while (arg.span.begin != last) {
         out += (Some(outside) -> Span(last,last+1))
         last += 1
       }
       out += (Some(arg.arg) -> Span(arg.span.begin, arg.span.end))
       last = arg.span.end
     }
-    while(words.length != last) {
+    while (words.length != last) {
       out += (Some(outside) -> Span(last,last+1))
       last += 1
     }

@@ -25,11 +25,9 @@ import epic.constraints.ChartConstraints
 case class ProjectingCoreGrammar[L, W](parser: Parser[L, W],
                                        projector: ChartProjector[L, W]) extends Grammar[L, W] {
 
-
   def topology = parser.topology
 
   def lexicon = parser.lexicon
-
 
   override def withPermissiveLexicon: Grammar[L, W] = {
     ???
@@ -46,4 +44,3 @@ case class ProjectingCoreGrammar[L, W](parser: Parser[L, W],
   }
 
 }
-

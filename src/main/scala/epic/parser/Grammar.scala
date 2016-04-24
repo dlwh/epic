@@ -48,7 +48,6 @@ object Grammar {
     def topology = f1.topology
     def lexicon = f1.lexicon
 
-
     override def withPermissiveLexicon: Grammar[L, W] = product(f1.withPermissiveLexicon, f2.withPermissiveLexicon)
 
     def anchor(words: IndexedSeq[W],
@@ -62,7 +61,6 @@ object Grammar {
       def topology = g
 
       def lexicon = l
-
 
       override def withPermissiveLexicon: Grammar[L, W] = identity(ruleTopology, l.morePermissive)
 

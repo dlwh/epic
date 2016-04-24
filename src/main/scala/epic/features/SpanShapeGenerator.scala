@@ -22,9 +22,9 @@ class SpanShapeFeaturizerBetter(numContextWords: Int, useRichContext: Boolean) e
     new SurfaceFeatureAnchoring[String] {
       def featuresForSpan(begin: Int, end: Int): Array[Feature] = {
         val sig = SpanShapeGenerator.signatureAndContextFor(words, begin, end, numContextWords, useRichContext)
-//        println("Features for span " + words.slice(begin, end) + ": " + sig);
-//        val sig2 = SpanShapeGenerator.signatureFor(words, begin, end, includeContext = false)
-//        Array(SpanShapeFeature(sig), SpanShapeFeature(sig2))
+        // println("Features for span " + words.slice(begin, end) + ": " + sig);
+        // val sig2 = SpanShapeGenerator.signatureFor(words, begin, end, includeContext = false)
+        // Array(SpanShapeFeature(sig), SpanShapeFeature(sig2))
         Array(SpanShapeFeature(sig))
       }
     }
@@ -36,9 +36,9 @@ class FullWordSpanShapeFeaturizer(commonWords: Set[String], numContextWords: Int
     new SurfaceFeatureAnchoring[String] {
       def featuresForSpan(begin: Int, end: Int): Array[Feature] = {
         val sig = SpanShapeGenerator.signatureAndContextFor(words, begin, end, numContextWords, true, commonWords)
-        //        println("Features for span " + words.slice(begin, end) + ": " + sig);
-        //        val sig2 = SpanShapeGenerator.signatureFor(words, begin, end, includeContext = false)
-        //        Array(SpanShapeFeature(sig), SpanShapeFeature(sig2))
+        // println("Features for span " + words.slice(begin, end) + ": " + sig);
+        // val sig2 = SpanShapeGenerator.signatureFor(words, begin, end, includeContext = false)
+        // Array(SpanShapeFeature(sig), SpanShapeFeature(sig2))
         Array(SpanShapeFeature(sig))
       }
     }
@@ -52,7 +52,6 @@ class FullWordSpanShapeFeaturizer(commonWords: Set[String], numContextWords: Int
 object SpanShapeGenerator extends Serializable {
 
   val MAX_LEN = 6
-
 
   def apply(v1: IndexedSeq[String], begin: Int, end: Int): String = signatureFor(v1,begin, end)
 
@@ -71,7 +70,7 @@ object SpanShapeGenerator extends Serializable {
       appendWordShape(i, words, result)
       i += 1
     }
-    if(i < end) {
+    if (i < end) {
       //val remainingLength = distanceBinner.binnedDistance(begin, end - MAX_LEN)
       //result ++= "~"  * remainingLength
       result += '~'
@@ -100,7 +99,7 @@ object SpanShapeGenerator extends Serializable {
       if (i < 0) {
         result += '#'
       } else {
-        if(commonWords(words(i))) {
+        if (commonWords(words(i))) {
           result ++= words(i)
         } else if (richContext) {
           appendWordShape(i, words, result)
@@ -115,7 +114,7 @@ object SpanShapeGenerator extends Serializable {
       appendWordShape(i, words, result)
       i += 1
     }
-    if(i < end) {
+    if (i < end) {
       //val remainingLength = distanceBinner.binnedDistance(begin, end - MAX_LEN)
       //result ++= "~"  * remainingLength
       result += '~'
@@ -130,7 +129,7 @@ object SpanShapeGenerator extends Serializable {
       if (i >= words.length) {
         result += '#'
       } else {
-        if(commonWords(words(i))) {
+        if (commonWords(words(i))) {
           result ++= words(i)
         } else if (richContext) {
           appendWordShape(i, words, result)
@@ -143,7 +142,6 @@ object SpanShapeGenerator extends Serializable {
     result.toString
   }
 
-
   def appendWordShape(i: Int, words: IndexedSeq[String], result: StringBuilder) {
     val w = if (i < 0 || i >= words.length) "#" else words(i)
     if (w.isEmpty) {
@@ -151,7 +149,7 @@ object SpanShapeGenerator extends Serializable {
       result += 'ε'
     } else {
       var c = w(0)
-      if(c == '-') {
+      if (c == '-') {
         c = w match {
           case "-LRB-" => '('
           case "-RRB-" => ')'
@@ -188,7 +186,7 @@ object SpanShapeGenerator extends Serializable {
       if (i < 0) {
         result += '#'
       } else {
-        if(commonWords(words(i))) {
+        if (commonWords(words(i))) {
           result ++= words(i)
         } else if (richContext) {
           appendWordShape(i, words, result)
@@ -204,8 +202,8 @@ object SpanShapeGenerator extends Serializable {
       i += 1
     }
 
-    if(i <= split) {
-      if(i < split) {
+    if (i <= split) {
+      if (i < split) {
         result += '~'
       }
       appendWordShape(split, words, result)
@@ -213,7 +211,7 @@ object SpanShapeGenerator extends Serializable {
       i = split + 2
     }
 
-    if(i < end) {
+    if (i < end) {
       //val remainingLength = distanceBinner.binnedDistance(begin, end - MAX_LEN)
       //result ++= "~"  * remainingLength
       result += '~'
@@ -228,7 +226,7 @@ object SpanShapeGenerator extends Serializable {
       if (i >= words.length) {
         result += '#'
       } else {
-        if(commonWords(words(i))) {
+        if (commonWords(words(i))) {
           result ++= words(i)
         } else if (richContext) {
           appendWordShape(i, words, result)

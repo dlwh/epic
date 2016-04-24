@@ -45,7 +45,6 @@ case class AnnotatedLabel(label: String,
                           index: Int = -1) extends Feature with CachedHashCode {
   def hasAnnotation(f: Annotation): Boolean = features.contains(f)
 
-
   def annotate(sym: Annotation*) = copy(features = features ++ sym)
 
   def isIntermediate = label.nonEmpty && label.charAt(0) == '@'
@@ -60,17 +59,16 @@ case class AnnotatedLabel(label: String,
     if (index != -1)  {
       x += s"-$index"
     }
-
     x
   }
 
   override def toString = {
     val components = new ArrayBuffer[String]()
     headTag.foreach(components += _)
-    if(parents.nonEmpty) {
+    if (parents.nonEmpty) {
       components += parents.mkString("^","^","")
     }
-    if(siblings.nonEmpty) {
+    if (siblings.nonEmpty) {
       val b = new StringBuilder()
       siblings foreach {
         case Left(sib) =>
@@ -82,13 +80,13 @@ case class AnnotatedLabel(label: String,
       }
       components += b.toString
     }
-    if(features.nonEmpty)
+    if (features.nonEmpty)
       components ++= features.iterator.map(_.toString)
 
-    if(index != -1)
+    if (index != -1)
       components += s"_$index"
 
-    if(components.nonEmpty) components.mkString(label+"[", ", ", "]")
+    if (components.nonEmpty) components.mkString(label+"[", ", ", "]")
     else label
   }
 }
@@ -110,7 +108,7 @@ object AnnotatedLabel {
       label.split("[-=#]")
     }
 
-    if(label.isEmpty) return AnnotatedLabel.TOP
+    if (label.isEmpty) return AnnotatedLabel.TOP
 
     val tag = fields.head
 

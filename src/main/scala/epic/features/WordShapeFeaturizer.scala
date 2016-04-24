@@ -19,7 +19,7 @@ class WordShapeFeaturizer(wordCounts: Counter[String, Double],
       def words = w
 
       def featuresForWord(pos: Int): Array[Feature] = {
-        if(pos < 0 || pos >= words.length) {
+        if (pos < 0 || pos >= words.length) {
           boundaryFeatures
         } else {
            _minimalFeatures(pos)
@@ -28,7 +28,7 @@ class WordShapeFeaturizer(wordCounts: Counter[String, Double],
 
       private val _minimalFeatures: IndexedSeq[Array[Feature]] = words.indices.map { i =>
         val index = indices(i)
-        if(index >= 0) {
+        if (index >= 0) {
           WordShapeFeaturizer.this.minimalFeatures(index)
         } else {
           val ww = words(i)
@@ -46,7 +46,7 @@ class WordShapeFeaturizer(wordCounts: Counter[String, Double],
 
   private val boundaryFeatures = Array[Feature](BoundaryFeature)
 
-  private val shapes =  Encoder.fromIndex(wordIndex).tabulateArray(w => if(wordCounts(w) > functionWordThreshold) interner(IndicatorFeature(w)) else interner(WordFeature(WordShapeGenerator(w), 'Shape)))
+  private val shapes =  Encoder.fromIndex(wordIndex).tabulateArray(w => if (wordCounts(w) > functionWordThreshold) interner(IndicatorFeature(w)) else interner(WordFeature(WordShapeGenerator(w), 'Shape)))
 
   // caches
   private val minimalFeatures = Array.tabulate(wordIndex.size){ i =>

@@ -30,17 +30,14 @@ import breeze.util.Lens
  */
 object HeadFinder {
   def left[L]: HeadFinder[L] = new RuleBasedHeadFinder[L](Left, HeadRules.empty)
-
   def right[L]: HeadFinder[L] = new RuleBasedHeadFinder[L](Right, HeadRules.empty)
-
   val collins = new RuleBasedHeadFinder(Left, rules = HeadRules.collinsHeadRules)
-
   implicit def lensed[L, U](hf: HeadFinder[L])(implicit lens: Lens[U, L]) = hf.projected(lens.get(_: U))
 }
 
 trait HeadFinder[L] {
 
-  def findHeadChild(l: L, children: L*):Int
+  def findHeadChild(l: L, children: L*): Int
 
   def findHeadChild(r: Rule[L]): Int = r match {
     case UnaryRule(_, _, _) => 0
@@ -66,7 +63,6 @@ trait HeadFinder[L] {
     }
   }
 
-
   def annotateHeadIndices[W](t: Tree[L]): Tree[(L, Int)] = t match {
     case t:BinarizedTree[L] => annotateHeadIndices(t)
     case Tree(l, children, span) if children.isEmpty => Tree(l -> t.span.begin, IndexedSeq.empty, t.span)
@@ -75,7 +71,6 @@ trait HeadFinder[L] {
       val rec = children.map(annotateHeadIndices(_))
       Tree(l -> rec(headChild).label._2, rec, t.span)
   }
-
 
   def annotateHeadIndices(t: BinarizedTree[L]): BinarizedTree[(L, Int)] = t match {
     case NullaryTree(l, span) =>  NullaryTree(l -> t.span.begin, t.span)
@@ -86,7 +81,7 @@ trait HeadFinder[L] {
       val headChild = findHeadChild(t)
       val recB = annotateHeadIndices(b)
       val recC = annotateHeadIndices(c)
-      val head = if(headChild == 0) recB.label._2 else recC.label._2
+      val head = if (headChild == 0) recB.label._2 else recC.label._2
       BinaryTree(a -> head, recB, recC, t.span)
   }
 
@@ -100,14 +95,12 @@ trait HeadFinder[L] {
       val headChild = findHeadChild(t)
       val recB: BinarizedTree[(L, L)] = annotateHeadTags(b)
       val recC: BinarizedTree[(L, L)] = annotateHeadTags(c)
-      val head = if(headChild == 0) recB.label._2 else recC.label._2
+      val head = if (headChild == 0) recB.label._2 else recC.label._2
       BinaryTree(a -> head, recB, recC, t.span)
   }
 
-
   def projected[U](f: U => L): HeadFinder[U]
 }
-
 
 /**
  * Can annotate a tree with the head word. Usually
@@ -133,7 +126,6 @@ class RuleBasedHeadFinder[L](defaultDirection: Dir = Left, rules: HeadRules[L]) 
       val rec = children.map(annotateHeadWords(_, words))
       Tree(l -> rec(headChild).label._2, rec, t.span)
   }
-
 
   def projected[U](f: U => L): HeadFinder[U] = new RuleBasedHeadFinder[U](defaultDirection, rules.projected(f))
 
@@ -170,7 +162,6 @@ case class HeadRule[L](dir: Dir, dis: Boolean, heads: Seq[L]) { rule =>
       }
       candidates.find(_ >= 0) getOrElse -1
     }
-
   }
 }
 
@@ -203,25 +194,19 @@ trait HeadRules[L] extends Serializable { outer =>
 
 object HeadRules {
 
-
   /**
    * Search direction for the match.
    */
   sealed trait Dir
-
   case object Left extends Dir
-
   case object Right extends Dir
 
   def empty[L]: HeadRules[L] = fromMap[L](Map.empty)
 
   def fromMap[L](map: Map[L, Seq[HeadRule[L]]]): HeadRules[L] = new HeadRules[L] {
     protected type InnerLabel = L
-
     protected def findRules(l: L) = map.getOrElse(l, Seq.empty)
-
     protected def proj(l: L) = l
-
   }
 
   private def shr[L](dir: Dir, dis: Boolean, heads: L*) = HeadRule(dir, dis, heads)
@@ -279,7 +264,6 @@ object HeadRules {
         shr(Right, true, "JJ", "JJS", "RB", "QP"))
     )
 
-
     //add in binarized symbols, and look for the binarized symbol first
     (basic ++ basic.map {
       case (k, v) => ("@" + k, v)
@@ -293,32 +277,28 @@ object HeadRules {
     } : Map[String, Seq[HeadRule[String]]]
   }
 
-
-
 }
 
 /*
-
-
 object NegraHeadFinder extends HeadFinder[AnnotatedLabel] {
   def findHeadChild(l: AnnotatedLabel, children: AnnotatedLabel*): Int = l.label match {
     case "ISU" =>
       var index = children.indexWhere(a => a.hasAnnotation(FunctionalTag("UC")))
-      if(index < 0) {
+      if (index < 0) {
         children.length - 1
       } else {
         index
       }
     case "DL" =>
       var index = children.indexWhere(a => a.hasAnnotation(FunctionalTag("HD")) || a.hasAnnotation(FunctionalTag("DH")))
-      if(index < 0) {
+      if (index < 0) {
         children.length - 1
       } else {
         index
       }
     case _ =>
       var index = children.indexWhere(a => a.hasAnnotation(FunctionalTag("HD")) || a.hasAnnotation(FunctionalTag("PH")))
-      if(index < 0) {
+      if (index < 0) {
         index = children.length - 1
       }
       index

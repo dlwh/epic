@@ -21,10 +21,10 @@ class MorphFeaturizer private (morphLookupTable: MorphFeaturizer.MorphLookupTabl
       morphLookupTable(w)
     }
     val feats = w.indices.map(i => morphFeats(i).filter(feat => feat.label == "lem").map(feat => IndicatorFeature(feat): Feature))
-//    logger.info("Feats for sentence: " + w)
-//    (0 until w.size).foreach(i => logger.info(w(i) + ": " + feats(i).toSeq))
+    // logger.info("Feats for sentence: " + w)
+    // (0 until w.size).foreach(i => logger.info(w(i) + ": " + feats(i).toSeq))
 
-    def featuresForWord(pos: Int): Array[Feature] = if(pos < 0 || pos >= w.length) Array(BeginSentFeature) else feats(pos)
+    def featuresForWord(pos: Int): Array[Feature] = if (pos < 0 || pos >= w.length) Array(BeginSentFeature) else feats(pos)
 
     def words: IndexedSeq[String] = w
   }

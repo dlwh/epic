@@ -102,7 +102,6 @@ You can also epic.trees.annotations.KMAnnotator to get more or less Klein and Ma
                               oldWeights: File = null) extends ParserModelFactory[AnnotatedLabel, String] with SafeLogging {
   type MyModel = LatentParserModel[AnnotatedLabel, (AnnotatedLabel, Int), String]
 
-
   override def make(trainTrees: IndexedSeq[TreeInstance[AnnotatedLabel, String]],
                     topology: RuleTopology[AnnotatedLabel], lexicon: Lexicon[AnnotatedLabel, String],
                     constrainer: Factory[AnnotatedLabel, String]): MyModel = {
@@ -119,7 +118,7 @@ You can also epic.trees.annotations.KMAnnotator to get more or less Klein and Ma
         AnnotatedLabel(split(0)) -> split(1).toInt
       }
       pairs.toMap + (xbarGrammar.root -> 1)
-    } else if(splitUselessStates) {
+    } else if (splitUselessStates) {
       Map(xbarGrammar.root -> 1)
     } else {
       LatentModelFactory.statesToNotSplit.iterator.map(s => AnnotatedLabel(s) -> 1).toMap  + (xbarGrammar.root -> 1)

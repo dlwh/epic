@@ -22,7 +22,7 @@ case class ContextFeaturizer[W](featurizer: WordFeaturizer[W], window: Int) exte
     }
 
     def featuresForWord(pos: Int): Array[Feature] = {
-      if(pos < 0 || pos >= words.length)
+      if (pos < 0 || pos >= words.length)
         Array.empty
       else
         settedFeatures(pos)

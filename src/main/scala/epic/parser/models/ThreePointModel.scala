@@ -35,8 +35,8 @@ class ThreePointModel[L, L2, W](annotator: (BinarizedTree[L], IndexedSeq[W]) => 
                                  labelFeaturizer: RefinedFeaturizer[L, W, Feature],
                                  wordFeaturizer: IndexedWordFeaturizer[W],
                                  rank: Int) extends ParserModel[L, W] {
-  override type Inference = ThreePointModel.ThreePointInference[L, L2, W]
 
+  override type Inference = ThreePointModel.ThreePointInference[L, L2, W]
 
   override def accumulateCounts(inf: Inference, s: Scorer, d: TreeInstance[L, W], m: Marginal, accum: ExpectedCounts, scale: Double): Unit = {
     inf.grammar.extractEcounts(m, accum.counts, scale)
@@ -44,9 +44,8 @@ class ThreePointModel[L, L2, W](annotator: (BinarizedTree[L], IndexedSeq[W]) => 
   }
 
   override val featureIndex = new SegmentedIndex(new AffineTransform.Index(rank, labelFeaturizer.index.size, false) +: IndexedSeq.fill(3)(new AffineTransform.Index(rank, wordFeaturizer.featureIndex.size, false)))
- override def inferenceFromWeights(weights: DenseVector[Double]): Inference = {
 
-
+  override def inferenceFromWeights(weights: DenseVector[Double]): Inference = {
     val grammar = new ThreePointModel.Grammar[L, L2, W](topology, lexicon, refinedTopology, refinements, labelFeaturizer,
       wordFeaturizer,
       featureIndex,
@@ -57,6 +56,7 @@ class ThreePointModel[L, L2, W](annotator: (BinarizedTree[L], IndexedSeq[W]) => 
   }
 
   override def initialValueForFeature(f: Feature): Double = f.hashCode().toDouble / 1000 % 2
+
 }
 
 object ThreePointModel {
@@ -79,8 +79,6 @@ object ThreePointModel {
       LatentTreeMarginal(product, annotated)
     }
 
-
-
   }
 
   @SerialVersionUID(1L)
@@ -94,7 +92,6 @@ object ThreePointModel {
                           weights: DenseVector[Double]) extends epic.parser.Grammar[L, W] with Serializable {
     val IndexedSeq(ruleMatrix, wordMatrices@ _*) = reshapeWeightMatrices(weights)
     assert(wordMatrices.length == 3)
-
 
     private def reshapeWeightMatrices(weights: DenseVector[Double]): IndexedSeq[DenseMatrix[Double]] = {
       val segments = featureIndex.shardWeights(weights)
@@ -136,12 +133,12 @@ object ThreePointModel {
 
       // doesn't include split point, which we'll do online
       val precachedSpanActivations = TriangularArray.tabulate(words.length + 1) { (i, j) =>
-        if(sparsityPattern.isAllowedSpan(i, j) && i != j) {
+        if (sparsityPattern.isAllowedSpan(i, j) && i != j) {
           val result = DenseVector.ones[Double](wordActivations.head.head.size)
 
           result :*= actForPos(i, Point.First)
           result :*= actForPos(j - 1, Point.Last)
-//          println(result)
+          // println(result)
 
           result
         } else {
@@ -149,10 +146,9 @@ object ThreePointModel {
         }
       }
 
-
       def scoreBinaryRule(begin: Int, split: Int, end: Int, rule: Int, ref: Int) = {
         val surfaceAct = precachedSpanActivations(begin, end)
-        if(surfaceAct == null) {
+        if (surfaceAct == null) {
           Double.NegativeInfinity
         } else {
           val rfeats = lspec.featuresForBinaryRule(begin, split, end, rule, ref)
@@ -162,7 +158,7 @@ object ThreePointModel {
 
       def scoreUnaryRule(begin: Int, end: Int, rule: Int, ref: Int) = {
         val surfaceAct = precachedSpanActivations(begin, end)
-        if(surfaceAct == null) {
+        if (surfaceAct == null) {
           Double.NegativeInfinity
         } else {
           val rfeats = lspec.featuresForUnaryRule(begin, end, rule, ref)
@@ -172,7 +168,7 @@ object ThreePointModel {
 
       def scoreSpan(begin: Int, end: Int, tag: Int, ref: Int) = {
         val surfaceAct = precachedSpanActivations(begin, end)
-        if(surfaceAct == null) {
+        if (surfaceAct == null) {
           Double.NegativeInfinity
         } else {
           val rfeats = lspec.featuresForSpan(begin, end, tag, ref)
@@ -199,9 +195,9 @@ object ThreePointModel {
       def checkFlush(begin: Int, split: Int, end: Int) {
         val state: (Int, Int) = (begin, end)
         val oldState: (Int, Int) = states(split)
-        if(oldState != state) {
-          if(oldState != UNUSED) {
-            val ffeats = if(split >= length) sspec.featuresForSpan(oldState._1, oldState._2) else sspec.featuresForSplit(oldState._1, split, oldState._2)
+        if (oldState != state) {
+          if (oldState != UNUSED) {
+            val ffeats = if (split >= length) sspec.featuresForSpan(oldState._1, oldState._2) else sspec.featuresForSplit(oldState._1, split, oldState._2)
             layer.tallyDerivative(deriv, ruleCountsPerState(split) *= scale, new FeatureVector(ffeats))
             ruleCountsPerState(split) := 0.0
           }
@@ -252,8 +248,6 @@ object ThreePointModel {
           for(f <- sspec.featuresForWord(end - 1)) {
             axpy(score * scale, actWithoutEnd, dWeights(Point.Last.id)(::, f))
           }
-
-
         }
 
         override def visitBinaryRule(begin: Int, split: Int, end: Int, rule: Int, ref: Int, score: Double): Unit = {
@@ -279,14 +273,11 @@ object ThreePointModel {
           for(f <- sspec.featuresForWord(split)) {
             axpy(score * scale, splitAct, dWeights(Point.Split.id)(::, f))
           }
-
         }
       }
 
     }
   }
-
-
 
 }
 
@@ -310,8 +301,6 @@ You can also epic.trees.annotations.KMAnnotator to get more or less Klein and Ma
                                  extraParams: ExtraParams = ExtraParams()) extends ParserModelFactory[AnnotatedLabel, String] {
 
   type MyModel = ThreePointModel[AnnotatedLabel, AnnotatedLabel, String]
-
-
 
   override def make(trainTrees: IndexedSeq[TreeInstance[AnnotatedLabel, String]],
                     topology: RuleTopology[AnnotatedLabel],
@@ -342,18 +331,17 @@ You can also epic.trees.annotations.KMAnnotator to get more or less Klein and Ma
       }
     }
 
-    if(useMorph)
+    if (useMorph)
       wf += MorphFeaturizer(pathsToMorph.split(","))
 
     val indexedWord = IndexedWordFeaturizer.fromData(wf, annTrees.map{_.words})
 
     def labelFeaturizer(l: AnnotatedLabel) = Set(l, l.baseAnnotatedLabel).toSeq
-    def ruleFeaturizer(r: Rule[AnnotatedLabel]) = if(useGrammar) Set(r, r.map(_.baseAnnotatedLabel)).toSeq else if(r.isInstanceOf[UnaryRule[AnnotatedLabel]]) Set(r.parent, r.parent.baseAnnotatedLabel).toSeq else Seq.empty
+    def ruleFeaturizer(r: Rule[AnnotatedLabel]) = if (useGrammar) Set(r, r.map(_.baseAnnotatedLabel)).toSeq else if (r.isInstanceOf[UnaryRule[AnnotatedLabel]]) Set(r.parent, r.parent.baseAnnotatedLabel).toSeq else Seq.empty
 
     val featurizer = new ProductionFeaturizer[AnnotatedLabel, AnnotatedLabel, String](xbarGrammar, indexedRefinements,
       lGen=labelFeaturizer,
       rGen=ruleFeaturizer)
-
 
     new ThreePointModel(annotator.latent,
       constrainer,
@@ -363,7 +351,5 @@ You can also epic.trees.annotations.KMAnnotator to get more or less Klein and Ma
       rank)
 
   }
-
-
 
 }

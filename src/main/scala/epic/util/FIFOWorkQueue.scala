@@ -35,9 +35,9 @@ class FIFOWorkQueue[-In, Out](f: In=>Out)(implicit context: ExecutionContext) ex
 
   def next() = {waitUntilReady(); Await.result(queue.poll(), Duration.Inf)}
 
-  private def waitUntilReady():Boolean = {
+  private def waitUntilReady(): Boolean = {
     synchronized {
-      while(!done && queue.isEmpty) {
+      while (!done && queue.isEmpty) {
         wait()
       }
     }

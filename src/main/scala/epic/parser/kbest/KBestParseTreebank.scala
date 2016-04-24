@@ -44,7 +44,7 @@ object KBestParseTreebank {
 
     def parse(trainTrees: IndexedSeq[TreeInstance[AnnotatedLabel, String]], out: PrintWriter) = {
       val parred = trainTrees.par
-      if(params.threads > 0)
+      if (params.threads > 0)
         parred.tasksupport = new ForkJoinTaskSupport(new ForkJoinPool(params.threads))
       parred
         .map(ti => ti.words -> kbest.bestKParses(ti.words, params.k))

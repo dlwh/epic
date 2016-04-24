@@ -29,7 +29,7 @@ object HammingLossAugmentation {
 
 
     def scoreTransition(prev: Int, cur: Int, begin: Int, end: Int): Double = {
-      if(gt.isGoldSegment(begin, end, cur)) -precisionScale
+      if (gt.isGoldSegment(begin, end, cur)) -precisionScale
       else recallScale
     }
 

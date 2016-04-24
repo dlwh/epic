@@ -21,10 +21,9 @@ object CONLLSequenceReader {
         val outputs = new ArrayBuffer[String]
         import scala.util.control.Breaks._
         breakable {
-          while(source.hasNext) {
+          while (source.hasNext) {
             val line = source.next()
-            if(line.trim().isEmpty) break
-
+            if (line.trim().isEmpty) break
             val split = line.split(splitToken)
             inputs += split.take(split.length -1).toIndexedSeq
             outputs += split.last
@@ -53,9 +52,9 @@ object CONLLSequenceReader {
         val inputs = new ArrayBuffer[IndexedSeq[String]]()
         import scala.util.control.Breaks._
         breakable {
-          while(source.hasNext) {
+          while (source.hasNext) {
             val line = source.next()
-            if(line.trim().isEmpty) break
+            if (line.trim().isEmpty) break
 
             val split = line.split(splitToken)
             inputs += split

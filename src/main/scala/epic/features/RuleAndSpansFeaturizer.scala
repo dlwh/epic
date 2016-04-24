@@ -17,7 +17,6 @@ trait RuleAndSpansFeaturizer[W] extends Serializable {
   }
 }
 
-
 class ZeroRuleAndSpansFeaturizer[W]() extends RuleAndSpansFeaturizer[W] {
   val emptyArray = Array[Feature]()
   

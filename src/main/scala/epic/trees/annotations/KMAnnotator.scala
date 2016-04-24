@@ -21,6 +21,7 @@ package annotations
  */
 
 case class KMAnnotator( horizontal: Int = 2, vertical: Int = 2) extends TreeAnnotator[AnnotatedLabel, String, AnnotatedLabel] {
+
   val pipeline =
     FilterAnnotations[String](Set(FunctionalTag("TMP"))) andThen
     Markovize[String](horizontal,vertical) andThen

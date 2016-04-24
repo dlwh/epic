@@ -46,22 +46,20 @@ object SentimentTreebankPipeline extends LazyLogging {
                      rootLossScaling: Double = 1.0,
                      computeTrainLL: Boolean = false)
 
-
   def main(args: Array[String]):Unit = {
     val params = CommandLineParser.readIn[Options](args)
 
     val treebank = new ProcessedTreebank(params.path, treebankType = "simple")
 
     var trainTrees: IndexedSeq[TreeInstance[AnnotatedLabel, String]] = treebank.trainTrees
-    if(params.evalOnTest && params.includeDevInTrain)
+    if (params.evalOnTest && params.includeDevInTrain)
       trainTrees ++= treebank.devTrees
     println(trainTrees.size + " train trees, " + treebank.devTrees.size + " dev trees, " + treebank.testTrees.size + " test trees")
     val gen = GenerativeParser.fromTrees(trainTrees)
 
-
     class GoldBracketingsConstraints extends ChartConstraints.Factory[AnnotatedLabel, String] {
       val trees = (trainTrees ++ treebank.devTrees ++ treebank.testTrees).map(ti => ti.words -> ti.tree).toMap
-//      val trees = ((if (params.includeDevInTrain) trainTrees else trainTrees ++ treebank.devTrees) ++ treebank.testTrees).map(ti => ti.words -> ti.tree).toMap
+      // val trees = ((if (params.includeDevInTrain) trainTrees else trainTrees ++ treebank.devTrees) ++ treebank.testTrees).map(ti => ti.words -> ti.tree).toMap
 
       def constraints(w: IndexedSeq[String]): ChartConstraints[AnnotatedLabel] = {
         val constraints = SpanConstraints.fromTree(trees.getOrElse(w, gen.bestBinarizedTree(w)))
@@ -87,7 +85,7 @@ object SentimentTreebankPipeline extends LazyLogging {
       sentimentLoss,
       params.rootLossScaling)
 
-//    val model = new SpanModelFactory(annotator = GenerativeParser.defaultAnnotator(vertical = params.v), dummyFeats = 0.5).make(trainTrees, constrainer)
+    // val model = new SpanModelFactory(annotator = GenerativeParser.defaultAnnotator(vertical = params.v), dummyFeats = 0.5).make(trainTrees, constrainer)
     val model = params.modelFactory.make(trainTrees, gen.topology, gen.lexicon, new GoldBracketingsConstraints)
 
     val obj = new ModelObjective(model, trainTrees)
@@ -100,10 +98,10 @@ object SentimentTreebankPipeline extends LazyLogging {
     for ((state, iter) <- itr.take(params.maxIterations).zipWithIndex
          if iter % params.iterationsPerEval == 0) try {
       val parser = model.extractParser(state.x).copy(decoder=new MaxConstituentDecoder[AnnotatedLabel, String])
-//      if(params.evalOnTest)
-//        println("Eval: " + evaluate(s"$name-$iter", parser, treebank.testTrees))
-//      else
-//        println("Eval: " + evaluate(s"$name-$iter", parser, treebank.devTrees))
+      // if (params.evalOnTest)
+      //   println("Eval: " + evaluate(s"$name-$iter", parser, treebank.testTrees))
+      // else
+      //   println("Eval: " + evaluate(s"$name-$iter", parser, treebank.devTrees))
       if (params.computeTrainLL) {
         computeLL(trainTrees, model, state.x)
       }
@@ -119,11 +117,9 @@ object SentimentTreebankPipeline extends LazyLogging {
       case e: Exception => e.printStackTrace(); throw e
     }
 
-
   }
   
   def renderArr(arr: Array[Array[Int]]) = arr.map(_.map(_.toString).reduce(_ + "\t" + _)).reduce(_ + "\n" + _)
-
 
   class Model[L, W](val inner: ParserModel[L, W]) extends epic.framework.Model[TreeInstance[L, W]] {
     type ExpectedCounts = inner.ExpectedCounts
@@ -132,7 +128,6 @@ object SentimentTreebankPipeline extends LazyLogging {
     type Scorer = inner.Scorer
 
     def emptyCounts = inner.emptyCounts
-
 
     def accumulateCounts(inf: Inference, s: Scorer, d: TreeInstance[L, W], m: Marginal, accum: ExpectedCounts, scale: Double): Unit = {
       inner.accumulateCounts(inf.pm.asInstanceOf[inner.Inference], s, d, m, accum, scale)
@@ -164,7 +159,6 @@ object SentimentTreebankPipeline extends LazyLogging {
       pm.goldMarginal(scorer, v)
     }
 
-
     def marginal(anch: Scorer, v: TreeInstance[L, W]): Inference[L, W]#Marginal = {
       LatentTreeMarginal[L, W](anch, v.tree.map(l => labels:scala.collection.IndexedSeq[(L, Int)]))
     }
@@ -191,14 +185,12 @@ object SentimentTreebankPipeline extends LazyLogging {
                                             rootsRightBinary + stats.rootsRightBinary,
                                             numBinaryRoots + stats.numBinaryRoots)
 
-    
     override def toString = {
       "Spans: " + SentimentEvaluator.renderNumerDenom(spansRight, numSpans) + " (Ternary: " + SentimentEvaluator.renderNumerDenom(spansRightTernary, numSpans) +
       "), Roots: " + SentimentEvaluator.renderNumerDenom(rootsRight, numRoots) + " (Ternary: " + SentimentEvaluator.renderNumerDenom(rootsRightTernary, numRoots) + ")"
     }
-      
-                                            
-//    override def toString = f"Stats(cspans=${coarseSpansRight.toDouble/coarseSpans}%.4f: $coarseSpansRight/$coarseSpans spans=${spansRight.toDouble/numSpans}%.4f: $spansRight/$numSpans, coarseRoots=${coarseRootsRight.toDouble/numCoarseRoots}: $coarseRootsRight/$numCoarseRoots , roots=${rootsRight.toDouble/numRoots}%.4f: $rootsRight/$numRoots)"
+
+    // override def toString = f"Stats(cspans=${coarseSpansRight.toDouble/coarseSpans}%.4f: $coarseSpansRight/$coarseSpans spans=${spansRight.toDouble/numSpans}%.4f: $spansRight/$numSpans, coarseRoots=${coarseRootsRight.toDouble/numCoarseRoots}: $coarseRootsRight/$numCoarseRoots , roots=${rootsRight.toDouble/numRoots}%.4f: $rootsRight/$numRoots)"
   }
 
   object DecodeType extends Enumeration {
@@ -291,7 +283,6 @@ object SentimentTreebankPipeline extends LazyLogging {
         val neg = summed(AnnotatedLabel("0")) + summed(AnnotatedLabel("1"))
         val pos = summed(AnnotatedLabel("3")) + summed(AnnotatedLabel("4"))
         val neutral = summed(AnnotatedLabel("2"))
-
         if(neg > pos && neg > neutral) {
           AnnotatedLabel("0")
         } else if (pos > neg && pos > neutral) {
@@ -304,8 +295,7 @@ object SentimentTreebankPipeline extends LazyLogging {
       }
     }
   }
-  
-  
+
   def computeLL(trainTrees: IndexedSeq[TreeInstance[AnnotatedLabel, String]], model: SpanModel[AnnotatedLabel,AnnotatedLabel,String], weights: DenseVector[Double]) {
     println("Computing final log likelihood on the whole training set...")
     val inf = model.inferenceFromWeights(weights)

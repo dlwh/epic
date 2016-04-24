@@ -67,7 +67,7 @@ class PositionalNeuralModel[L, L2, W](annotator: (BinarizedTree[L], IndexedSeq[W
   override type Inference = PositionalNeuralModel.Inference[L, L2, W]
 
   override def accumulateCounts(inf: Inference, s: Scorer, d: TreeInstance[L, W], m: Marginal, accum: ExpectedCounts, scale: Double): Unit = {
-//    println("Extracting ecounts")
+    // println("Extracting ecounts")
     inf.grammar.extractEcounts(m, accum.counts, scale)
     
     if (maybeSparseSurfaceFeaturizer.isDefined) {
@@ -78,7 +78,7 @@ class PositionalNeuralModel[L, L2, W](annotator: (BinarizedTree[L], IndexedSeq[W
       val totalTransformSize = transforms.map(_.index.size).sum + depTransforms.map(_.index.size).sum  + decoupledTransforms.map(_.index.size).sum
       accum.counts += DenseVector.vertcat(DenseVector.zeros[Double](totalTransformSize), innerAccum.counts)
     }
-//    println("Ecounts extracted")
+    // println("Ecounts extracted")
     accum.loss += scale * m.logPartition
   }
 
@@ -195,7 +195,6 @@ object PositionalNeuralModel {
                                      depFeaturizer, layers, penultimateLayers, depLayers, maybeSparseSurfaceFeaturizer, decoupledLayers, penultimateDecoupledLayers, weights, origPTModel)
     }
 
-
     /**
      * N.B. does not extracted expected counts for sparse features; this is done outside this loop
      */
@@ -206,7 +205,7 @@ object PositionalNeuralModel {
       val depSpec = depFeaturizer.anchor(w)
       val lspec = labelFeaturizer.anchor(w)
       
-//      val maxTetraLen = ((w.size + 2) * (w.size + 3) * (w.size + 4))/6 + ((w.size + 1) * (w.size + 2))/2 + w.size + 2
+      // val maxTetraLen = ((w.size + 2) * (w.size + 3) * (w.size + 4))/6 + ((w.size + 1) * (w.size + 2))/2 + w.size + 2
       
       def tetra(begin: Int, split: Int, end: Int) = {
         (end * (end + 1) * (end + 2))/6 + ((split + 1) * split / 2 + begin)
@@ -217,10 +216,10 @@ object PositionalNeuralModel {
       val unaryRuleCountsPerState = new HashMap[Int,SparseVector[Double]]
       val binaryRuleCountsPerState = new HashMap[Int,SparseVector[Double]]
       val spanCountsPerState = new HashMap[Int,SparseVector[Double]]
-//      val ruleCountsPerState = Array.fill(maxTetraLen)(SparseVector.zeros[Double](labelFeaturizer.index.size))
-//      val countsPerHeadDepPair = Array.tabulate(w.size, w.size)((i, j) => 0.0)
-//      val statesUsed = Array.fill(maxTetraLen)(false)
-//      val untetra = Array.fill(maxTetraLen)((-1, -1, -1))
+      // val ruleCountsPerState = Array.fill(maxTetraLen)(SparseVector.zeros[Double](labelFeaturizer.index.size))
+      // val countsPerHeadDepPair = Array.tabulate(w.size, w.size)((i, j) => 0.0)
+      // val statesUsed = Array.fill(maxTetraLen)(false)
+      // val untetra = Array.fill(maxTetraLen)((-1, -1, -1))
       val untetra = new HashMap[Int,(Int,Int,Int)]
       
       m visit new AnchoredVisitor[L] {
@@ -407,7 +406,7 @@ object PositionalNeuralModel {
         var i = 0
         var score = 0.0
         val wdata = weights.data
-        while(i < features.length) {
+        while (i < features.length) {
           score += wdata(features(i) + sparseFeaturesOffset)
           i += 1
         }

@@ -1,6 +1,5 @@
 package epic.features
 
-
 /**
  * Converts a string into another string with properties of that string
  * Useful for rare or 0 count words
@@ -30,7 +29,6 @@ object EnglishWordClassGenerator extends (String=>String) with Serializable {
     } else if (hasLower) {
       sb.append("-LC")
     }
-
     if (hasDigit) {
       sb.append("-NUM")
     }

@@ -35,11 +35,7 @@ trait ParserModel[L, W] extends epic.framework.StandardExpectedCounts.Model[Tree
     val inf = inferenceFromWeights(weights).forTesting
     Parser(constrainer, inf.grammar, ChartDecoder[L, W]())
   }
-
-
-
 }
-
 
 trait ParserInference[L, W] extends ProjectableInference[TreeInstance[L, W], UnrefinedGrammarAnchoring[L, W]] {
   type ExpectedCounts = StandardExpectedCounts[Feature]
@@ -51,11 +47,9 @@ trait ParserInference[L, W] extends ProjectableInference[TreeInstance[L, W], Unr
 
   override def forTesting: ParserInference[L, W] = this
 
-
   def scorer(v: TreeInstance[L, W]): Scorer = {
      grammar.anchor(v.words, constrainer.constraints(v.words))
   }
-
 
   /**
    * Produces the "guess marginal" which is the marginal conditioned on only the input data
@@ -80,7 +74,6 @@ trait ParserInference[L, W] extends ProjectableInference[TreeInstance[L, W], Unr
 
   def baseAugment(v: TreeInstance[L, W])  = UnrefinedGrammarAnchoring.identity(grammar.topology, grammar.lexicon, v.words, ChartConstraints.noSparsity)
 
-
   def project(v: TreeInstance[L, W], s: Scorer, m: Marginal, oldAugment: UnrefinedGrammarAnchoring[L, W]): UnrefinedGrammarAnchoring[L, W] = {
     projector.project(this, v, m)
   }
@@ -90,7 +83,6 @@ trait ParserInference[L, W] extends ProjectableInference[TreeInstance[L, W], Unr
 
 trait ParserModelFactory[L, W] extends ParserExtractableModelFactory[L, W] {
   type MyModel <: ParserModel[L, W]
-
 }
 
 

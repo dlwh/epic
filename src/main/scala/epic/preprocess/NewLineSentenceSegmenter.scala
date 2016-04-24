@@ -19,14 +19,13 @@ class NewLineSentenceSegmenter(locale: Locale = Locale.getDefault) extends Sente
     val spans = new ArrayBuffer[(Span, Sentence)]()
 
     var start = 0
-    while(m.find()) {
+    while (m.find()) {
       val end = m.end()
-      if(end - start > 1)
+      if (end - start > 1)
         spans += (Span(start, end) -> Sentence())
       start = end
     }
     spans += Span(start, slab.content.length) -> Sentence()
-
 
     slab.addLayer[Sentence](spans)
   }

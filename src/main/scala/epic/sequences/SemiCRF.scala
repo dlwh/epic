@@ -59,7 +59,7 @@ object SemiCRF {
     val obj = new ModelObjective(model, data)
     val cached = new CachedBatchDiffFunction(obj)
     val weights = opt.minimize(cached, obj.initialWeightVector(false))
-//    GradientTester.test(cached, weights, randFraction = 1.0, toString={(i: Int) => model.featureIndex.get(i).toString}, tolerance=0.0)
+    // GradientTester.test(cached, weights, randFraction = 1.0, toString={(i: Int) => model.featureIndex.get(i).toString}, tolerance=0.0)
     val crf = model.extractCRF(weights)
 
     crf
@@ -101,7 +101,6 @@ object SemiCRF {
 
     override def labelIndex: OptionIndex[L] = new OptionIndex(crf.labelIndex)
   }
-
 
   /**
    * An Anchoring encodes all the information needed to score Semimarkov models.
@@ -175,13 +174,13 @@ object SemiCRF {
 
       val allowedLabels = spanMarginals.map {  arr =>
          BitSet.empty ++ (0 until arr.length).filter(i => arr(i) >= threshold)
-//           BitSet.empty ++ (0 until arr.length)
+         // BitSet.empty ++ (0 until arr.length)
       }
 
       LabeledSpanConstraints(allowedLabels)
     }
 
-    def hasSupportOver(m: Marginal[L, W]):Boolean = {
+    def hasSupportOver(m: Marginal[L, W]): Boolean = {
       object FailureException extends Exception
       try {
         m visit new TransitionVisitor[L, W] {
@@ -223,7 +222,6 @@ object SemiCRF {
       val backwardScore: Array[Array[Double]] = this.backwardScores(scorer, forwardScores)
       val partition = softmax(forwardScores.last)
       val _s = scorer
-
 
       new Marginal[L, W] {
 
@@ -269,7 +267,6 @@ object SemiCRF {
           }
 
         }
-
 
         /** Log-normalized probability of seing segment with transition */
         def transitionMarginal(prev: Int, cur: Int, begin: Int, end: Int): Double = {
@@ -329,7 +326,6 @@ object SemiCRF {
         def transitionMarginal(prev: Int, cur: Int, begin: Int, end: Int): Double = {
           numerics.I(goldEnds(begin) == end && goldLabels(begin) == cur && goldPrevLabels(begin) == prev)
         }
-
 
         def logPartition: Double = score
       }
@@ -455,8 +451,6 @@ object SemiCRF {
       backwardScores
     }
 
-
-
   }
 
   trait ConstraintSemiCRF[L, W] extends SemiCRF[L, W] with LabeledSpanConstraints.Factory[L, W] {
@@ -466,17 +460,15 @@ object SemiCRF {
 
   @SerialVersionUID(1L)
   class IdentityConstraintSemiCRF[L, W](val labelIndex: OptionIndex[L]) extends ConstraintSemiCRF[L, W] with Serializable { outer =>
+
     def scorer(w: IndexedSeq[W]) = new Anchoring[L,W]() {
       def words = w
       def scoreTransition(prev: Int, cur: Int, begin: Int, end: Int) = 0.0
       def labelIndex = outer.labelIndex
-
       def constraints: LabeledSpanConstraints[L] = NoConstraints
     }
 
-
     def constraints(w: IndexedSeq[W]) = NoConstraints
-
     def constraints(seg: Segmentation[L, W], keepGold: Boolean) = NoConstraints
   }
 
@@ -502,7 +494,6 @@ object SemiCRF {
         c = crf.marginal(w).computeSpanConstraints(threshold)
         cache.put(w, c)
       }
-
       c
     }
 
@@ -515,34 +506,24 @@ object SemiCRF {
       }
     }
 
-
     def scorer(w: IndexedSeq[W]): Anchoring[L, W] = {
       val c = constraints(w)
 
       new Anchoring[L, W] {
         def words: IndexedSeq[W] = w
-
-
         def constraints: LabeledSpanConstraints[L] = c
-
         def labelIndex:OptionIndex[L] = crf.labelIndex
-
         def scoreTransition(prev: Int, cur: Int, begin: Int, end: Int): Double =
           numerics.logI(c.isAllowedLabeledSpan(begin, end, cur))
-
       }
 
     }
   }
 
-
   trait IndexedFeaturizer[L, W] {
     def anchor(w: IndexedSeq[W]):AnchoredFeaturizer[L, W]
-
-
     def labelIndex: OptionIndex[L]
     def featureIndex: Index[Feature]
-
     def hasTransitionFeatures: Boolean = true
   }
 
@@ -550,7 +531,6 @@ object SemiCRF {
     def featureIndex: Index[Feature]
     def featuresForTransition(prev: Int, cur: Int, begin: Int, end: Int):FeatureVector
   }
-
 
   def viterbi[L, W](anchoring: Anchoring[L ,W], id: String=""):Segmentation[L, W] = {
     val length = anchoring.length
@@ -607,7 +587,6 @@ object SemiCRF {
 
     Segmentation(segments.reverse, anchoring.words, id)
   }
-
 
   def posteriorDecode[L, W](m: Marginal[L, W], id: String = "") = {
     val length = m.length
@@ -681,7 +660,6 @@ object SemiCRF {
 
   class IdentityAnchoring[L, W](val words: IndexedSeq[W], val labelIndex: OptionIndex[L], val constraints: LabeledSpanConstraints[L]) extends Anchoring[L, W] {
     def scoreTransition(prev: Int, cur: Int, beg: Int, end: Int): Double = 0.0
-
     def canStartLongSegment(pos: Int): Boolean = true
   }
 

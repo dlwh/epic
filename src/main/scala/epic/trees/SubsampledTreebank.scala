@@ -36,7 +36,7 @@ class SubsampledTreebank(base: Treebank[String], numTrain: Int, numDev:Int, numT
   }
 
   private def downSample[K](trees: Iterator[K], num: Int) = {
-    if(num < 0) trees
+    if (num < 0) trees
     else {
       // TODO: maybe randomly sample
       trees.take(num)

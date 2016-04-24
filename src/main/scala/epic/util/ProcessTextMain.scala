@@ -16,7 +16,7 @@ import java.util.concurrent.{LinkedBlockingDeque, TimeUnit, ThreadPoolExecutor}
 trait ProcessTextMain[Model, AnnotatedType] {
   import ProcessTextMain._
 
-  def render(model: Model, ann: AnnotatedType, tokens: IndexedSeq[String]):String
+  def render(model: Model, ann: AnnotatedType, tokens: IndexedSeq[String]): String
 
   def renderFailed(model: Model, tokens: IndexedSeq[String], reason: Throwable): String = {
     s"### Could not tag $tokens, because ${reason.getMessage}... ${reason.getStackTrace.take(2).mkString(";")}".replaceAll("\n", " ")
@@ -60,7 +60,7 @@ trait ProcessTextMain[Model, AnnotatedType] {
       case "none" | "whitespace" => new WhitespaceTokenizer
     }
 
-    implicit val context = if(params.threads > 0) {
+    implicit val context = if (params.threads > 0) {
       scala.concurrent.ExecutionContext.fromExecutor(new ThreadPoolExecutor(1, params.threads, 1, TimeUnit.SECONDS, new LinkedBlockingDeque[Runnable]()))
     } else {
       scala.concurrent.ExecutionContext.global
@@ -72,7 +72,7 @@ trait ProcessTextMain[Model, AnnotatedType] {
       val queue = FIFOWorkQueue(sentenceSegmenter.sentences(src)){sent =>
         val tokens = tokenizer(sent).toIndexedSeq
         try {
-          if(tokens.length > params.maxLength) {
+          if (tokens.length > params.maxLength) {
             throw new SentenceTooLongException(tokens.length)
           }
           val tree = annotate(model, tokens)

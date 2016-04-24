@@ -32,7 +32,7 @@ class CrossProductIndexTest extends FunSuite {
 
     for(i <- 0 until index1.size; j <- 0 until index2.size) {
       val mapped = res.mapped(i, j)
-      if(mapped >= 0)
+      if (mapped >= 0)
         assert(csc(i, j) === weights(mapped))
     }
 
@@ -62,7 +62,7 @@ class CrossProductIndexTest extends FunSuite {
 
     for(i <- 0 until index1.size; j <- 0 until index2.size) {
       val mapped = res.mapped(i, j)
-      if(mapped >= 0)
+      if (mapped >= 0)
         assert(csc(i, j) === weights(mapped))
     }
 

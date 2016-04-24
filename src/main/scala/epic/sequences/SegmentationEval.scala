@@ -11,11 +11,12 @@ import com.typesafe.scalalogging.slf4j.LazyLogging
  * @author dlwh
  */
 object SegmentationEval extends LazyLogging {
+
   def eval[L ,W](crf: SemiCRF[L, W], examples: IndexedSeq[Segmentation[L, W]], logOnlyErrors: Boolean = true):Stats = {
     examples.par.aggregate(new Stats(0,0,0)) ({ (stats, gold )=>
       val guess = crf.bestSequence(gold.words, gold.id +"-guess")
       try {
-        if(guess.label != gold.label)
+        if (guess.label != gold.label)
           logger.trace(s"gold = $gold guess = $guess " +
             s"guess logPartition = ${crf.goldMarginal(guess.segments, guess.words).logPartition} " +
             s"gold logPartition =${crf.goldMarginal(gold.segments, gold.words).logPartition}")
@@ -23,11 +24,10 @@ object SegmentationEval extends LazyLogging {
         case ex: Exception => logger.debug("Can't recover gold for " + gold)
       }
       val myStats = evaluateExample(Set(), guess, gold)
-      if(!logOnlyErrors || myStats.f1 < 1.0)
+      if (!logOnlyErrors || myStats.f1 < 1.0)
         logger.info("Guess:\n" + guess.render + "\n Gold:\n" + gold.render+ "\n" + myStats)
       stats + myStats
     }, {_ + _})
-
   }
 
   def evaluateExample[W, L](outsideLabel: Set[L], guess: Segmentation[L, W], gold: Segmentation[L, W]): SegmentationEval.Stats = {

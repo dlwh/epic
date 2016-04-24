@@ -173,7 +173,7 @@ object GenerativeTrainer extends ParserPipeline {
 
     val refinedGrammar = Grammar.generative(xbar, xbarLexicon, indexedRefinements, binaryCounts, initUnaries, scorer)
 
-    if(params.grammarDumpPath != null) {
+    if (params.grammarDumpPath != null) {
       val out = new BufferedWriter(new FileWriter(params.grammarDumpPath))
       refinedGrammar.prettyPrint(out)
       out.close()

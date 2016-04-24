@@ -2,7 +2,6 @@ package epic.constraints
 
 import epic.util.CacheBroker
 
-
 /**
  * A cached version of [[epic.constraints.LabeledSpanConstraints.Factory]].
  * Uses the [[epic.util.CacheBroker]] infrastructure
