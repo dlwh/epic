@@ -186,10 +186,7 @@ trait HeadRules[L] extends Serializable { outer =>
     val myRules: Seq[HeadRule[InnerLabel]] = findRules(proj(parent))
     val mapped = children.map(proj)
     val answers = myRules.view.map(_.findMatchIndex(mapped: _*)).filterNot(_ == -1)
-    if (answers.nonEmpty) {
-      Some(answers.head)
-    }
-    else None
+    answers.headOption
   }
 
   def lensed[U](implicit lens: Lens[U, L]) = projected(lens.get(_: U))
