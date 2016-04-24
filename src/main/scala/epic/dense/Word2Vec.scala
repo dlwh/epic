@@ -29,7 +29,7 @@ object Word2Vec {
       }
     }
     val dimsEachSource = vectorsEachSource.map(_.values.head.length)
-    val finalVectorDim = Math.min(maxVectorLen, dimsEachSource.reduce(_ + _) + (if (inputVectorBias) 1 else 0))
+    val finalVectorDim = Math.min(maxVectorLen, dimsEachSource.sum + (if (inputVectorBias) 1 else 0))
     val finalVectors = new HashMap[String,Array[Float]]
     val rng = new Random(0)
     val mostCommonMisses = Counter[String,Double]

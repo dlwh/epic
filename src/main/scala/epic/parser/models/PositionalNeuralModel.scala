@@ -75,7 +75,7 @@ class PositionalNeuralModel[L, L2, W](annotator: (BinarizedTree[L], IndexedSeq[W
       val innerAccum = StandardExpectedCounts.zero(f.index)
       m.expectedCounts(maybeSparseSurfaceFeaturizer.get, innerAccum, scale)
       //      val totalTransformSize = transform.index.size
-      val totalTransformSize = transforms.map(_.index.size).foldLeft(0)(_ + _) + depTransforms.map(_.index.size).foldLeft(0)(_ + _)  + decoupledTransforms.map(_.index.size).foldLeft(0)(_ + _)
+      val totalTransformSize = transforms.map(_.index.size).sum + depTransforms.map(_.index.size).sum  + decoupledTransforms.map(_.index.size).sum
       accum.counts += DenseVector.vertcat(DenseVector.zeros[Double](totalTransformSize), innerAccum.counts)
     }
 //    println("Ecounts extracted")
@@ -186,7 +186,7 @@ object PositionalNeuralModel {
     val SpanLayerIdx = 0
     val UnaryLayerIdx = 1
     val BinaryLayerIdx = 2
-    val dcSpanFeatOffset = layers.map(_.index.size).foldLeft(0)(_ + _) + depLayers.map(_.index.size).foldLeft(0)(_ + _)
+    val dcSpanFeatOffset = layers.map(_.index.size).sum + depLayers.map(_.index.size).sum
     val dcUnaryFeatOffset = dcSpanFeatOffset + (if (decoupledLayers.nonEmpty) decoupledLayers(0).index.size else 0)
     val dcBinaryFeatOffset = dcUnaryFeatOffset + (if (decoupledLayers.nonEmpty) decoupledLayers(1).index.size else 0)
     
@@ -328,7 +328,7 @@ object PositionalNeuralModel {
       val depSpec = depFeaturizer.anchor(w)
       val lspec = labelFeaturizer.anchor(w)
       val fspec = if (maybeSparseSurfaceFeaturizer.isDefined) maybeSparseSurfaceFeaturizer.get.anchor(w) else null
-      val sparseFeatsStart = if (maybeSparseSurfaceFeaturizer.isDefined) layers.map(_.index.size).foldLeft(0)(_ + _) + depLayers.map(_.index.size).foldLeft(0)(_ + _) + decoupledLayers.map(_.index.size).foldLeft(0)(_ + _) else -1
+      val sparseFeatsStart = if (maybeSparseSurfaceFeaturizer.isDefined) layers.map(_.index.size).sum + depLayers.map(_.index.size).sum + decoupledLayers.map(_.index.size).sum else -1
 
       private def tetra(begin: Int, split: Int, end: Int) = {
         (end * (end + 1) * (end + 2))/6 + ((split + 1) * split / 2 + begin)
