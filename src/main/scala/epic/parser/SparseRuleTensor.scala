@@ -21,7 +21,7 @@ final class SparseRuleTensor[L] private(val leftChildOffsets: Array[Int],
                                val unaryParentIndicesAndScores: Array[Int],
                                outside: Boolean) extends Serializable {
 
-  val numLeftChildren = leftChildOffsets.size - 1
+  val numLeftChildren = leftChildOffsets.length - 1
 
   def leftChildRange(lc: Int):Span = Span(leftChildOffsets(lc), leftChildOffsets(lc+1) )
 

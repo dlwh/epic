@@ -28,7 +28,7 @@ object Word2Vec {
         throw new RuntimeException("Unrecognized vectors: " + word2vecPath)
       }
     }
-    val dimsEachSource = vectorsEachSource.map(_.values.head.size)
+    val dimsEachSource = vectorsEachSource.map(_.values.head.length)
     val finalVectorDim = Math.min(maxVectorLen, dimsEachSource.reduce(_ + _) + (if (inputVectorBias) 1 else 0))
     val finalVectors = new HashMap[String,Array[Float]]
     val rng = new Random(0)
@@ -51,8 +51,8 @@ object Word2Vec {
           Array.tabulate(finalVectorDim)(i => if (i == finalVectorDim - 1 && inputVectorBias) 1.0F else 0.0F)
         }
       }
-      val vectorTrimmed = if (vector.size > finalVectorDim) vector.slice(0, finalVectorDim) else vector
-      require(vectorTrimmed.size == finalVectorDim, "Mismatched sizes, expected dimension " + finalVectorDim + " but got " + vector.size + " clipped to " + vectorTrimmed.size)
+      val vectorTrimmed = if (vector.length > finalVectorDim) vector.slice(0, finalVectorDim) else vector
+      require(vectorTrimmed.length == finalVectorDim, "Mismatched sizes, expected dimension " + finalVectorDim + " but got " + vector.length + " clipped to " + vectorTrimmed.length)
       finalVectors.put(word, vectorTrimmed)
     }
     println("Read embeddings for " + voc.size + " words from " + word2vecPaths.size + " sources, " +
@@ -94,7 +94,7 @@ object Word2Vec {
   }
   
   private def augmentVectorsToCompleteVocabulary(word2vecMap: HashMap[String,Array[Float]], voc: Set[String], inputVectorBias: Boolean) = {
-    val word2vecDim = word2vecMap.values.head.size
+    val word2vecDim = word2vecMap.values.head.length
     val rng = new Random(0)
     for (unkWord <- voc -- word2vecMap.keySet) {
       // Set to random noise except for the bias feature, if it's there
