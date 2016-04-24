@@ -30,8 +30,6 @@ final case class SeenWithTagFeature(str: Any) extends Feature
 final case class LeftWordFeature(str: Any) extends Feature
 final case class RightWordFeature(str: Any) extends Feature
 
-
-
 class WordPropertyFeaturizer(wordCounts: Counter[String, Double],
                              commonWordThreshold: Int = 20) extends WordFeaturizer[String] with Serializable {
   import epic.features.WordPropertyFeaturizer._
@@ -44,14 +42,14 @@ class WordPropertyFeaturizer(wordCounts: Counter[String, Double],
     val indices = words.map(wordIndex)
     val myFeatures = words.indices.map(i => if (indices(i) < 0) featuresFor(words(i)).toArray else knownWordFeatures(indices(i)))
     def featuresForWord(pos: Int): Array[Feature] = {
-      if(pos < 0) Array(BeginSentFeature)
-      else if(pos >= words.length) Array(EndSentFeature)
+      if (pos < 0) Array(BeginSentFeature)
+      else if (pos >= words.length) Array(EndSentFeature)
       else {
       val base = myFeatures(pos)
         // initial words nee special treatment
-        if( (words(pos).charAt(0).isUpper || words(pos).charAt(0).isTitleCase) && base.length > 1) {
+        if ( (words(pos).charAt(0).isUpper || words(pos).charAt(0).isTitleCase) && base.length > 1) {
           val isInitialWord = pos == 0 || words(pos -1) == "``"
-          if(isInitialWord) {
+          if (isInitialWord) {
             base ++ base.map(FirstWordCapsAnd)
           } else {
             base ++ base.map(NthWordCapsAnd)
@@ -61,14 +59,13 @@ class WordPropertyFeaturizer(wordCounts: Counter[String, Double],
         }
       }
     }
-
   }
 
   //  val signatureGenerator = EnglishWordClassGenerator
   def featuresFor(w: String): IndexedSeq[Feature] = {
     val wc = wordCounts(w)
     val features = ArrayBuffer[Feature]()
-    if(wc <= commonWordThreshold) {
+    if (wc <= commonWordThreshold) {
       val wlen = w.length
       val numCaps = (w:Seq[Char]).count{_.isUpper}
       val hasLetter = w.exists(_.isLetter)
@@ -80,16 +77,16 @@ class WordPropertyFeaturizer(wordCounts: Counter[String, Double],
       val numPeriods = w.count('.' ==)
       val hasPeriod = numPeriods > 0
 
-      if(numCaps > 0)  features += hasCapFeature
-      if(numCaps > 1)  features += hasManyCapFeature
+      if (numCaps > 0)  features += hasCapFeature
+      if (numCaps > 1)  features += hasManyCapFeature
       val isAllCaps = numCaps > 1 && !hasLower && !hasNotLetter
-      if(isAllCaps) features += isAllCapsFeature
+      if (isAllCaps) features += isAllCapsFeature
 
-      if(w.length == 2 && w(0).isLetter && w(0).isUpper && w(1) == '.') {
+      if (w.length == 2 && w(0).isLetter && w(0).isUpper && w(1) == '.') {
         features += isAnInitialFeature
       }
 
-      if(w.length > 1 && w.last == '.') {
+      if (w.length > 1 && w.last == '.') {
         features += endsWithPeriodFeature
 
       }
@@ -98,9 +95,9 @@ class WordPropertyFeaturizer(wordCounts: Counter[String, Double],
       var hasTitleCaseVariant = false
 
       val hasInitialUpper: Boolean = w(0).isUpper || w(0).isTitleCase
-      if(hasInitialUpper) {
+      if (hasInitialUpper) {
         features += hasInitCapFeature
-        if(wordCounts(w.toLowerCase) > 0) {
+        if (wordCounts(w.toLowerCase) > 0) {
           features += hasKnownLCFeature
           knownLowerCase = true
         } else {
@@ -111,16 +108,14 @@ class WordPropertyFeaturizer(wordCounts: Counter[String, Double],
         }
       }
 
-
-
-      if(!hasLower && hasLetter) features += hasNoLower
-      if(hasDash) features += hasDashFeature
-      if(hasDigit) {
+      if (!hasLower && hasLetter) features += hasNoLower
+      if (hasDash) features += hasDashFeature
+      if (hasDigit) {
         features += hasDigitFeature
         features += DigitNormalizedFeature(w.replaceAll("\\d", "0"))
       }
-      if(!hasLetter)  features += hasNoLetterFeature
-      if(hasNotLetter)  features += hasNotLetterFeature
+      if (!hasLetter)  features += hasNoLetterFeature
+      if (hasNotLetter)  features += hasNotLetterFeature
 
       // acronyms are all upper case with maybe some periods interspersed
       val hasAcronymShape = (
@@ -128,47 +123,44 @@ class WordPropertyFeaturizer(wordCounts: Counter[String, Double],
         || wlen >= 2 && hasPeriod && !hasLower && numCaps > 0 && !hasDigit && w.forall(c => c.isLetter || c == '.')
         )
       // make sure it doesn't have a lwoer case or title case variant, common for titles and place names...
-      if(hasAcronymShape  && !knownLowerCase && !hasTitleCaseVariant) {
+      if (hasAcronymShape  && !knownLowerCase && !hasTitleCaseVariant) {
         features += isProbablyAcronymFeature
       }
 
       // year!
-      if(wlen == 4 && !hasNonDigit) {
+      if (wlen == 4 && !hasNonDigit) {
         val year = try{w.toInt} catch {case e: NumberFormatException => 0}
-        if(year >= 1400 && year < 2300) {
+        if (year >= 1400 && year < 2300) {
           features += isProbablyYearFeature
         }
       }
 
-      if(hasDigit && !hasLetter) {
+      if (hasDigit && !hasLetter) {
         try {
           val n = w.replaceAll(",","").toDouble
-          if(!hasPeriod)
+          if (!hasPeriod)
             features += integerFeature
           else
             features += floatFeature
         } catch {case e: NumberFormatException =>}
       }
 
-      if(wlen > 3 && w.endsWith("s") && !w.endsWith("ss") && !w.endsWith("us") && !w.endsWith("is")) {
+      if (wlen > 3 && w.endsWith("s") && !w.endsWith("ss") && !w.endsWith("us") && !w.endsWith("is")) {
         features += endsWithSFeature
-        if(hasInitialUpper)
+        if (hasInitialUpper)
           features += hasInitialCapsAndEndsWithSFeature // we mess up NNP and NNPS
       }
 
-      if(wlen > 10) {
+      if (wlen > 10) {
         features += longWordFeature
-      } else if(wlen < 5) {
+      } else if (wlen < 5) {
         features += shortWordFeature
       }
     }
     features
   }
 
-
-
   def apply(w: String) = featuresFor(w)
-
 
 }
 

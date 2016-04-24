@@ -24,7 +24,6 @@ trait Example[+L,+T] extends Observation[T] with Labeled[L] with Serializable {o
     val features = outer.features
   }
 
-
   override def toString = {
     "Example { id =" + id + ", label = " + label + ", features = " + features + "}"
   }

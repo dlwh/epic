@@ -37,22 +37,21 @@ class EPModel[Datum, Augment <: AnyRef](maxEPIter: Int, initFeatureValue: Featur
   private val offsets = models.map(_.numFeatures).unfold(0)(_ + _)
   for(i <- 0 until models.length) { println(models(i) + " " + models(i).featureIndex.size)}
 
-
   def emptyCounts = {
     val counts = for (m <- models) yield m.emptyCounts
     EPExpectedCounts(0.0, counts.toIndexedSeq)
   }
 
-
   def accumulateCounts(inf: Inference, s: Scorer, datum: Datum, marg: Marginal, accum: ExpectedCounts, scale: Double):Unit = {
     import marg._
     for ( (model, i) <- models.zipWithIndex) {
       val marg = marginals(i)
-      if(marg != null)
+      if (marg != null)
         model.accumulateCounts(inf.inferences(i).asInstanceOf[model.Inference], s.scorers(i).asInstanceOf[model.Scorer], datum, marg.asInstanceOf[model.Marginal], accum.counts(i).asInstanceOf[model.ExpectedCounts], scale)
     }
     accum.loss += scale * marg.logPartition
   }
+
   def numModels = models.length
 
   val featureIndex: Index[Feature] = {
@@ -68,7 +67,6 @@ class EPModel[Datum, Augment <: AnyRef](maxEPIter: Int, initFeatureValue: Featur
     }
   }
 
-
   /**
    * just saves feature weights to disk as a serialized counter. The file is prefix.ser.gz
    */
@@ -81,12 +79,12 @@ class EPModel[Datum, Augment <: AnyRef](maxEPIter: Int, initFeatureValue: Featur
     }
     for(i <- 0 until numModels) {
       val mySlice = initWeights.slice(offsets(i), offsets(i+1))
-      if(mySlice.valuesIterator.exists(_ == 0)) {
+      if (mySlice.valuesIterator.exists(_ == 0)) {
         for(cw <- models(i).readCachedFeatureWeights(suffix+"-"+i)) {
           any = true
           var j = 0
-          while(j < cw.length) {
-            if(mySlice(j) == 0.0) {
+          while (j < cw.length) {
+            if (mySlice(j) == 0.0) {
               mySlice(j) = cw(j)
             }
             j += 1
@@ -94,13 +92,12 @@ class EPModel[Datum, Augment <: AnyRef](maxEPIter: Int, initFeatureValue: Featur
         }
       }
     }
-    if(any)
+    if (any)
       Some(initWeights)
     else
       None
 
   }
-
 
   /**
    * Caches the weights using the cache broker.
@@ -122,7 +119,7 @@ class EPModel[Datum, Augment <: AnyRef](maxEPIter: Int, initFeatureValue: Featur
     val toUse = new ArrayBuffer[Int]()
     var inferences = ArrayBuffer.tabulate(models.length) { i => 
       // hack, for now.
-      if(dropOutFraction > 0 && Rand.uniform.get < dropOutFraction)
+      if (dropOutFraction > 0 && Rand.uniform.get < dropOutFraction)
         null:ProjectableInference[Datum, Augment]
       else {
         toUse += i
@@ -130,7 +127,7 @@ class EPModel[Datum, Augment <: AnyRef](maxEPIter: Int, initFeatureValue: Featur
       }
     }
 
-    if(!inferences.exists(_ ne null)) {
+    if (!inferences.exists(_ ne null)) {
       toUse.clear()
       inferences = ArrayBuffer.tabulate(models.length) { i =>
         toUse += i
@@ -140,8 +137,6 @@ class EPModel[Datum, Augment <: AnyRef](maxEPIter: Int, initFeatureValue: Featur
 
     if (dropOutFraction != 0.0) 
       logger.info("Using inferences for models " + toUse.mkString(", "))
-     
-
 
     new EPInference(inferences, maxEPIter, epInGold = epInGold)
   }

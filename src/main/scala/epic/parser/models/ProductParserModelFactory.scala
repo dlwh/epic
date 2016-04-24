@@ -45,11 +45,10 @@ case class ProductParserModelFactory(annotator: TreeAnnotator[AnnotatedLabel, St
                                      oldWeights: File = null,
                                      splitFactor: Int = 1)  extends ParserModelFactory[AnnotatedLabel, String] with SafeLogging {
 
-
   type MyModel = LatentParserModel[AnnotatedLabel, (AnnotatedLabel, Seq[Int]), String]
 
   def genSplits(numModels: Int, numStates: Int):Seq[IndexedSeq[Int]] = {
-    if(numModels == 0)  Seq(IndexedSeq.empty)
+    if (numModels == 0)  Seq(IndexedSeq.empty)
     else for(r <- genSplits(numModels -1, numStates); i <- 0 until numStates) yield i +: r
   }
 
@@ -59,7 +58,6 @@ case class ProductParserModelFactory(annotator: TreeAnnotator[AnnotatedLabel, St
 
   def unsplit(x: (AnnotatedLabel, Seq[Int])) = x._1
 
-
   def splitRule[L, L2](r: Rule[L], split: L=>Seq[L2]):Seq[Rule[L2]] = r match {
       case BinaryRule(a, b, c) => for(aa <- split(a); bb <- split(b); cc <- split(c)) yield BinaryRule(aa, bb, cc)
         // don't allow non-identity rule refinements for identity rewrites
@@ -67,11 +65,9 @@ case class ProductParserModelFactory(annotator: TreeAnnotator[AnnotatedLabel, St
       case UnaryRule(a, b, chain) => for(aa <- split(a); bb <- split(b)) yield UnaryRule(aa, bb, chain)
     }
 
-
   override def make(trainTrees: IndexedSeq[TreeInstance[AnnotatedLabel, String]], topology: RuleTopology[AnnotatedLabel], lexicon: Lexicon[AnnotatedLabel, String], constrainer: Factory[AnnotatedLabel, String]): MyModel = {
     val annTrees: IndexedSeq[TreeInstance[AnnotatedLabel, String]] = trainTrees.map(annotator(_))
     val (annWords, annBinaries, annUnaries) = this.extractBasicCounts(annTrees)
-
 
     val (xbarGrammar, xbarLexicon) = topology -> lexicon
 
@@ -111,7 +107,6 @@ case class ProductParserModelFactory(annotator: TreeAnnotator[AnnotatedLabel, St
     } else {
       Counter[Feature, Double]()
     }
-
 
     def latentAnnotator(t: BinarizedTree[AnnotatedLabel], w: IndexedSeq[String]) = {
       annotator(t, w).map(finalRefinements.labels.refinementsOf)

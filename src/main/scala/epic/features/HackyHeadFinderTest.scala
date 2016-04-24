@@ -13,7 +13,7 @@ import scala.collection.mutable.HashMap
 object HackyHeadFinderTest {
 
   def main(args: Array[String]) {
-//    val treebank = new SimpleTreebank(new File(ptbPath), new File(ptbPath), new File(ptbPath))
+    // val treebank = new SimpleTreebank(new File(ptbPath), new File(ptbPath), new File(ptbPath))
     val treebank = Treebank.fromPennTreebankDir(new File("data/wsj"))
     
     val process = PartialTreeProcessor()
@@ -46,8 +46,7 @@ object HackyHeadFinderTest {
       wordToTagMap.put(word, bestTag)
     }
     println("Done training lexicon")
-    
-    
+
     val hf = HeadFinder.collins
     val hackyHeadFinder = new RuleBasedHackyHeadFinder
     
@@ -80,10 +79,9 @@ object HackyHeadFinderTest {
       val tree = devTreesWords(i)._1
       val words = devTreesWords(i)._2
       rec(tree, words)
-      
-//      println(tree.render(devTreesWords(i)._2, false))
-//      println(processedTrees(i).render(treesWords(i)._2, false))
-//      println(processedTreesWithIndices(i).render(treesWords(i)._2, false))
+      // println(tree.render(devTreesWords(i)._2, false))
+      // println(processedTrees(i).render(treesWords(i)._2, false))
+      // println(processedTreesWithIndices(i).render(treesWords(i)._2, false))
     }
     var totalAcc = 0
     var totalCount = 0

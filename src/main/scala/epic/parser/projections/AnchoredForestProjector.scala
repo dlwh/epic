@@ -46,7 +46,7 @@ class AnchoredForestProjector(threshold: Double) extends Serializable {
     }
 
     def getOrElseUpdate[T<:AnyRef](arr: Array[T], i: Int, t : =>T) = {
-      if(arr(i) == null) {
+      if (arr(i) == null) {
         arr(i) = t
       }
       arr(i)
@@ -63,10 +63,10 @@ class AnchoredForestProjector(threshold: Double) extends Serializable {
     val visitor = new AnchoredVisitor[L] {
       def visitSpan(begin: Int, end: Int, tag: Int, ref: Int, score: Double) {
         // fill in spans with 0 if they're active
-        if(score > 0.0) {
+        if (score > 0.0) {
           val index = TriangularArray.index(begin, end)
           getOrElseUpdate(lexicalScores, index, projVector())(tag) = 1.0
-          if(totals(index) eq null) {
+          if (totals(index) eq null) {
             totals(index) = projVector()
           }
           totals(index)(tag) += score
@@ -74,16 +74,16 @@ class AnchoredForestProjector(threshold: Double) extends Serializable {
       }
 
       def visitBinaryRule(begin: Int, split: Int, end: Int, rule: Int, ref: Int, count: Double) {
-        if(count > 0.0) {
+        if (count > 0.0) {
           val index = TriangularArray.index(begin, end)
           var forSpan = binaryScores(index)
-          if(forSpan eq null) {
+          if (forSpan eq null) {
             val numSplits = end - begin
             forSpan = new Array[OpenAddressHashArray[Double]](numSplits)
             binaryScores(index) = forSpan
           }
 
-          val parentArray = if(forSpan(split-begin) eq null) {
+          val parentArray = if (forSpan(split-begin) eq null) {
             forSpan(split-begin) = projRuleVector()
             forSpan(split-begin)
           } else {
@@ -95,14 +95,14 @@ class AnchoredForestProjector(threshold: Double) extends Serializable {
 
       def visitUnaryRule(begin: Int, end: Int, rule: Int, ref: Int, count: Double) {
         val index = TriangularArray.index(begin, end)
-        val parentArray = if(unaryScores(index) eq null) {
+        val parentArray = if (unaryScores(index) eq null) {
           unaryScores(index) = projRuleVector()
           unaryScores(index)
         } else {
           unaryScores(index)
         }
         parentArray(rule) += count
-        if(totalsUnaries(index) eq null) {
+        if (totalsUnaries(index) eq null) {
           totalsUnaries(index) = projVector()
         }
         totalsUnaries(index)(charts.topology.parent(rule)) += count
@@ -115,7 +115,6 @@ class AnchoredForestProjector(threshold: Double) extends Serializable {
     new AnchoredForestProjector.ForestData(lexicalScores, unaryScores, totalsUnaries, binaryScores, totals)
   }
 }
-
 
 object AnchoredForestProjector {
 

@@ -76,7 +76,7 @@ case class ViterbiDecoder[L, W]() extends ChartDecoder[L, W] with Serializable w
         val b = topology.child(r)
         val refB = refined.childRefinement(r, refR)
         val score = ruleScore + insideBotScore(begin, end, b, refB)
-        if(score > maxScore) {
+        if (score > maxScore) {
           maxScore = score
           maxChild = b
           maxChildRef = refB
@@ -84,7 +84,7 @@ case class ViterbiDecoder[L, W]() extends ChartDecoder[L, W] with Serializable w
         }
       }
 
-      if(maxScore == Double.NegativeInfinity) {
+      if (maxScore == Double.NegativeInfinity) {
         throw new ParseExtractionException(s"Couldn't find a tree! [$begin,$end) ${topology.labelIndex.get(root)}", words)
       }
 
@@ -101,7 +101,7 @@ case class ViterbiDecoder[L, W]() extends ChartDecoder[L, W] with Serializable w
       var maxSplit = -1
       var maxRule = -1
 
-      if(begin + 1 == end) {
+      if (begin + 1 == end) {
         return NullaryTree(labelIndex.get(root) -> rootRef, Span(begin, end))
       }
 
@@ -122,7 +122,7 @@ case class ViterbiDecoder[L, W]() extends ChartDecoder[L, W] with Serializable w
             + marginal.insideTopScore(split, end, c, refC)
             + spanScore
           )
-        if(score > maxScore) {
+        if (score > maxScore) {
           maxScore = score
           maxLeft = b
           maxLeftRef = refB
@@ -133,15 +133,13 @@ case class ViterbiDecoder[L, W]() extends ChartDecoder[L, W] with Serializable w
         }
       }
 
-      if(maxScore == Double.NegativeInfinity) {
+      if (maxScore == Double.NegativeInfinity) {
         throw new ParseExtractionException(s"Couldn't find a tree! [$begin,$end) ${topology.labelIndex.get(root)}\n", marginal.words)
       } else {
         val lchild = buildTreeUnary(begin, maxSplit, maxLeft, maxLeftRef)
         val rchild = buildTreeUnary(maxSplit, end, maxRight, maxRightRef)
         BinaryTree(labelIndex.get(root) -> rootRef, lchild, rchild, Span(begin, end))
       }
-
-
     }
 
     val maxRootRef = refined.validLabelRefinements(0, length, rootIndex).maxBy(ref => insideTopScore(0, length, rootIndex, ref))
@@ -187,11 +185,8 @@ case class MaxVariationalDecoder[L, W]() extends ProjectingChartDecoder[L, W](ne
 class MaxConstituentDecoder[L, W] extends ChartDecoder[L, W] {
 
   def extractBestParse(marginal: ParseMarginal[L, W]): BinarizedTree[L] = {
-
-
     val length = marginal.length
     import marginal.topology
-
 
     val spanMarginals = new AnchoredSpanProjector().projectSpanPosteriors(marginal)
     val maxSplit = TriangularArray.fill[Int](length+1)(0)
@@ -201,7 +196,6 @@ class MaxConstituentDecoder[L, W] extends ChartDecoder[L, W] {
     val maxTopScore = TriangularArray.fill[Double](length+1)(0.0)
 
     val numLabels = topology.labelIndex.size
-
 
     for {
       span <- 1 to length
@@ -214,7 +208,7 @@ class MaxConstituentDecoder[L, W] extends ChartDecoder[L, W] {
       maxTopLabel(begin, end) = argmax(spanMarginals.topType(begin, end).slice(0, numLabels))
       maxTopScore(begin, end) = spanMarginals.botType(begin, end)(maxBotLabel(begin, end)) + maxBotScore(begin, end)
 
-      if(end - begin > 1) {
+      if (end - begin > 1) {
         val (split, splitScore) = (for (split <- begin + 1 until end) yield {
           val score = maxTopScore(begin, split) + maxTopScore(split, end)
           (split, score)
@@ -260,9 +254,9 @@ class MaxConstituentDecoder[L, W] extends ChartDecoder[L, W] {
 
     def extract(begin: Int, end: Int):BinarizedTree[L] = {
       val bestBot = maxBotLabel(begin, end)
-      val lower = if(begin + 1== end) {
-//        if(maxBotScore(begin, end) == Double.NegativeInfinity)
-//          throw new RuntimeException(s"Couldn't make a good score for ${(begin, end)}. InsideIndices:  ${inside.bot.enteredLabelIndexes(begin, end).toIndexedSeq}\noutside: ${outside.bot.enteredLabelIndexes(begin, end).toIndexedSeq} logPartition: $logPartition")
+      val lower = if (begin + 1== end) {
+      // if (maxBotScore(begin, end) == Double.NegativeInfinity)
+      //  throw new RuntimeException(s"Couldn't make a good score for ${(begin, end)}. InsideIndices:  ${inside.bot.enteredLabelIndexes(begin, end).toIndexedSeq}\noutside: ${outside.bot.enteredLabelIndexes(begin, end).toIndexedSeq} logPartition: $logPartition")
         NullaryTree(topology.labelIndex.get(bestBot), Span(begin, end))
       } else {
         val split = maxSplit(begin, end)

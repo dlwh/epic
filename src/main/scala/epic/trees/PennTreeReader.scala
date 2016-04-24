@@ -57,12 +57,10 @@ class PennTreeReader(reader: Reader,
   def next() = {
     if (!hasNext) throw new NoSuchElementException()
     val tree = nextTree
-
     nextTree = readRootTree()
-    if(nextTree == null) {
+    if (nextTree == null) {
       in.close()
     }
-
     tree
   }
 
@@ -73,9 +71,7 @@ class PennTreeReader(reader: Reader,
       val tree = readTree(true, 0)
       tree
     }
-
   }
-
 
   private def readTree(isRoot : Boolean, pos : Int) : (Tree[String],IndexedSeq[String]) = {
     readLeftParen()
@@ -110,7 +106,6 @@ class PennTreeReader(reader: Reader,
       ch = in.read()
       atLeastOne = false
     }
-
     in.unread(ch)
     sb.toString()
   }
@@ -144,7 +139,6 @@ class PennTreeReader(reader: Reader,
   }
 
   private def isTextParen() = {
-
     var numRead = 0
     var ch = in.read()
     while (isLeftParen(ch)) {
@@ -167,9 +161,9 @@ class PennTreeReader(reader: Reader,
 
   private def readLeaf() = {
     var label = readText(true, true)
-    if(unescapeTokens)
+    if (unescapeTokens)
       label = TreebankTokenizer.treebankTokenToToken(label)
-    if(label.startsWith("/") && label.length == 2 && label(1) != '/') {
+    if (label.startsWith("/") && label.length == 2 && label(1) != '/') {
       label = label.drop(1) // ontonotes escapes periods as /.
     }
     label
@@ -208,6 +202,3 @@ class PennTreeReader(reader: Reader,
   }
 
 }
-
-
-

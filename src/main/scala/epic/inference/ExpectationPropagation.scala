@@ -40,7 +40,7 @@ class ExpectationPropagation[F,Q <: AnyRef](project: (Q,F)=>(Q,Double), criterio
       }
 
       def next() = {
-        if(consumed) hasNext
+        if (consumed) hasNext
         consumed = true
         cur
       }
@@ -48,8 +48,6 @@ class ExpectationPropagation[F,Q <: AnyRef](project: (Q,F)=>(Q,Double), criterio
 
     it
   }
-
-
 
 }
 
@@ -114,8 +112,6 @@ object ExpectationPropagation extends App {
     println(state.logPartition, state.q)
     assert(!state.logPartition.isNaN, state.q.s + " " + state.q.b)
   }
-
-
 
 }
 

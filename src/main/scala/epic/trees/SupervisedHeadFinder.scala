@@ -8,7 +8,7 @@ import java.io.InputStreamReader
 
 class SupervisedHeadFinder[L](innards: SupervisedHeadFinderInnards[L,_]) extends HeadFinder[L] {
   
-  def findHeadChild(l: L, children: L*):Int = {
+  def findHeadChild(l: L, children: L*): Int = {
     val head = innards.findHeadChild(l, children.toSeq)
     head
   }
@@ -51,7 +51,7 @@ object SupervisedHeadFinderInnards extends Serializable {
 case class HeadDB[B](symbolArityHeadChildCounts: Counter2[(B,Int),Int,Int],
                      ruleHeadChildCounts: Counter2[(B,Seq[B]),Int,Int],
                      defaultToLeft: Boolean = true) {
-  def findHeadChild(l: B, children: Seq[B]):Int = {
+  def findHeadChild(l: B, children: Seq[B]): Int = {
     // Manual arg-max because I suck at using Counter2
     var best = -1
     var bestCount = 0
@@ -91,8 +91,7 @@ object SupervisedHeadFinder {
     }
     val symbolArityHeadChildCounts = Counter2[(String,Int),Int,Int]()
     val ruleHeadChildCounts = Counter2[(String,Seq[String]),Int,Int]()
-    
-    
+
     def rec(tree: Tree[String], conllTree: Seq[Int]) {
       if (!tree.isLeaf) {
         val label = tree.label
@@ -125,14 +124,14 @@ object SupervisedHeadFinder {
     }
     println("Head finder trained; lengths matched on " + numMatched + " / " + conllTrees.size + " trees")
     new SupervisedHeadFinder[String](SupervisedHeadFinderInnards.fromHeadDB(new HeadDB(symbolArityHeadChildCounts, ruleHeadChildCounts)))
-//    HeadFinder.collins
+    // HeadFinder.collins
   }
   
   // Reads in a vector of parents, 0-indexed, with the root being -1
   def readDepTrees(conllPath: String): Seq[Seq[Int]] = {
     val in = breeze.io.FileStreams.input(new File(conllPath))
     val br = new BufferedReader(new InputStreamReader(in, "UTF-8"))
-//    val sents = new ArrayBuffer[Seq[Seq[String]]]()
+    // val sents = new ArrayBuffer[Seq[Seq[String]]]()
     val trees = new ArrayBuffer[Seq[Int]]()
     var currSent = new ArrayBuffer[Seq[String]]
     var i = 0

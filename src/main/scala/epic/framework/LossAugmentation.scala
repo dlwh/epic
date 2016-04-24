@@ -8,6 +8,5 @@ package epic.framework
  **/
 trait LossAugmentation[Datum, Augment] extends (Datum=>Augment) {
   def lossAugmentation(datum: Datum):Augment
-
   def apply(datum: Datum): Augment = lossAugmentation(datum)
 }

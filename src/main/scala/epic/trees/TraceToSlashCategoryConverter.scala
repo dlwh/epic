@@ -37,18 +37,12 @@ class TraceToSlashCategoryConverter extends (Tree[AnnotatedLabel] =>Tree[Annotat
           val (newChildren, gapsList) = tree.children.filterNot(_.label.label == "-NONE-").map(recursive(_, resolvedIndices ++ cCommandIndices)).unzip
           val gaps: IndexedSeq[(String, Int)] = gapsList.flatten.distinct
           val unresolvedGaps =  gaps.filterNot(pair => resolvedIndices(pair._2))
-
-
           val newLabel = label.copy(siblings = label.siblings ++ unresolvedGaps.map(pair => Left(pair._1)))
-
-
-//          if(unresolvedGaps.nonEmpty) {
-//            println(unresolvedGaps, newLabel)
-//          }
-
+          // if (unresolvedGaps.nonEmpty) {
+          //   println(unresolvedGaps, newLabel)
+          // }
           Tree(newLabel, newChildren, span)  -> unresolvedGaps
       }
-
     }
 
     val (newTree, gaps) = recursive(tree, Set.empty)
@@ -56,7 +50,6 @@ class TraceToSlashCategoryConverter extends (Tree[AnnotatedLabel] =>Tree[Annotat
     newTree
   }
 }
-
 
 object TraceToSlashCategoryConverter {
   def main(args: Array[String]):Unit = {

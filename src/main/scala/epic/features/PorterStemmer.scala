@@ -24,7 +24,6 @@ package epic.features
  */
 class PorterStemmer() extends (String=>String) {
   import PorterStemmer._
-
   def apply(w: String) = {
     if (w.length < 3) w.toLowerCase
     else {
@@ -45,8 +44,6 @@ class PorterStemmer() extends (String=>String) {
 object PorterStemmer extends PorterStemmer {
 
   def apply() = this
-
-
 
   private def step1(w: String) = step1c(step1b(step1a(w)))
 
@@ -209,7 +206,6 @@ object PorterStemmer extends PorterStemmer {
     else
       step5b(step5a(w))
   }
-
 
   private def step5a(w: String) = {
     if (w.length < 3) w

@@ -20,7 +20,7 @@ class WordClassFeaturizer(wordCounts: Counter[String, Double],
       def words = w
 
       def featuresForWord(pos: Int): Array[Feature] = {
-        if(pos < 0 || pos >= words.length) {
+        if (pos < 0 || pos >= words.length) {
           boundaryFeatures
         } else {
            _minimalFeatures(pos)
@@ -29,7 +29,7 @@ class WordClassFeaturizer(wordCounts: Counter[String, Double],
 
       private val _minimalFeatures: immutable.IndexedSeq[Array[Feature]] = words.indices.map { i =>
         val index = indices(i)
-        if(index >= 0) {
+        if (index >= 0) {
           WordClassFeaturizer.this.minimalFeatures(index)
         } else {
           val ww = words(i)
@@ -47,7 +47,7 @@ class WordClassFeaturizer(wordCounts: Counter[String, Double],
 
   private val boundaryFeatures = Array[Feature](BoundaryFeature)
 
-  private val classes =  Encoder.fromIndex(wordIndex).tabulateArray(w => if(wordCounts(w) > functionWordThreshold) interner(IndicatorFeature(w)) else interner(WordFeature(EnglishWordClassGenerator(w), 'Class)))
+  private val classes =  Encoder.fromIndex(wordIndex).tabulateArray(w => if (wordCounts(w) > functionWordThreshold) interner(IndicatorFeature(w)) else interner(WordFeature(EnglishWordClassGenerator(w), 'Class)))
 
   // caches
   private val minimalFeatures = Array.tabulate(wordIndex.size){ i =>

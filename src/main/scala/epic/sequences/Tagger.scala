@@ -20,10 +20,8 @@ trait Tagger[Tag] extends StringAnalysisFunction[Sentence with Token, Tag] with 
       val tagSeq = apply(tokens.map(_._2.token))
       tokens.map(_._1) zip tagSeq
     }
-
     slab.addLayer[Tag](annotatedSentences.flatten)
   }
-
 }
 
 object Tagger {

@@ -10,7 +10,6 @@ import epic.trees.Span
 
 import MascTransform._
 
-
 /**
 * Convert native MASC xml into CONLL format for named entity recognition.
 *
@@ -18,13 +17,11 @@ import MascTransform._
 */
 object MascTransform {
 
-
   case class MNode(id: String, targets: Seq[String])
   case class MAnnotation(id: String, label: String, ref: String, features: Map[String,String])
   case class MEdge(id: String, from: String, to: String)
   case class MRegion(id: String, start: Int, end: Int) extends Ordered[MRegion] {
     def span = Span(start, end)
-
     def compare(that: MRegion) = this.start - that.start
   }
 
@@ -32,9 +29,7 @@ object MascTransform {
     val mascDir = args(0)
     val outputDir = new File(if (args.length > 1) args(1) else "/tmp")
     outputDir.mkdirs
-
     val targets = collectTargets(new File(mascDir))
-
     // Get 3/5 for train, 1/5 for dev, and 1/5 for test
     val targetsAndIndices = targets.zipWithIndex
     val trainSet = targetsAndIndices.filter(_._2 % 5 < 3).unzip._1
@@ -57,11 +52,9 @@ object MascTransform {
     System.err.println("Creating " + outputName)
     val outputDir = new File(parentDir, outputName)
     outputDir.mkdirs
-
     val outputSentences = new FileWriter(new File(outputDir,outputName+"-sent.txt"))
     val outputTokens = new FileWriter(new File(outputDir,outputName+"-tok.txt"))
     val outputNer = new FileWriter(new File(outputDir,outputName+"-ner.txt"))
-
     for (mfile <- MascFile(targets)) {
       for (sentence <- mfile.sentences) {
         val tokenizedSentence = new StringBuffer
@@ -102,7 +95,6 @@ case class MascSentence (
   bioLabels: Seq[String],
   orderedRegions: Seq[MRegion]
 ) {
-
   lazy val numTokens = orderedTokens.length
 }
 
@@ -112,9 +104,7 @@ class MascFile (
   val rawtext: String,
   val sentences: Seq[MascSentence]
 ) {
-
   lazy val numSentences = sentences.length
-
 }
 
 object MascFile {
@@ -152,7 +142,6 @@ object MascFile {
     val sentenceXml = loadXML(dirFile(prefix+"-s.xml"))
     val sentenceRegions = getRegions(sentenceXml).sorted
 
-    
     // Basic segment information
     val segmentXml = loadXML(dirFile(prefix+"-seg.xml"))
     val segmentRegions = getRegions(segmentXml).map(r => r.id -> r).toMap
@@ -202,7 +191,6 @@ object MascFile {
       }
     }
 
-
     // Insert the "missing" sentences. (Content not marked as a sentence,
     // but containing tokens.)
     
@@ -223,7 +211,7 @@ object MascFile {
     // Pull out the sequence of token, pos, and NE for each sentence.
     val allOrderedTokRegions = tokenRegions.values.toIndexedSeq.sorted
     var index = 0
-    val allDataBySentence = paddedSentenceRegions.flatMap { region => {
+    val allDataBySentence = paddedSentenceRegions.flatMap { region =>
       //val startIndex = math.max(index, region.start)
       val startIndex = math.max(index, allOrderedTokRegions.indexWhere(t=>t.start>=region.start,index))
       //val startIndex = index
@@ -236,7 +224,7 @@ object MascFile {
         index = endIndex
         orderedTokPosNer(sentence)
       }
-    }}
+    }
 
     new MascFile(dir, prefix, rawtext, allDataBySentence)
   }
@@ -259,7 +247,6 @@ object MascUtil {
     //"date" -> "DAT"
     "date" -> "MISC"
   ).withDefault(x=>"O")
-
 
   def getRegions(doc: Elem) = (doc \\ "region").toSeq.map { rxml =>
     val Array(start, end) = (rxml \ "@anchors").toString.split(" ")

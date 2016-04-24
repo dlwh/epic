@@ -21,8 +21,6 @@ class TraceRemover[T, W](emptyCategory: T=>Boolean) extends (Tree[T] =>Tree[T]) 
         }
       }
     }
-
     rec(tree).get
   }
-
 }

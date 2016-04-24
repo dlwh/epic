@@ -29,7 +29,7 @@ object IndexedSurfaceFeaturizer {
                   constraintFactory: SpanConstraints.Factory[W],
                   deduplicateFeatures: Boolean = false) : IndexedSurfaceFeaturizer[W]  = {
 
-    val index = if(deduplicateFeatures) new NonRedundantIndexBuilder[Feature] else new NormalIndexBuilder[Feature]()
+    val index = if (deduplicateFeatures) new NonRedundantIndexBuilder[Feature] else new NormalIndexBuilder[Feature]()
 
     for(words <- data) {
       val cons = constraintFactory.get(words)
@@ -41,16 +41,13 @@ object IndexedSurfaceFeaturizer {
       }
     }
 
-
     new MySurfaceFeaturizer[W](feat, constraintFactory, index.result())
   }
 
   @SerialVersionUID(1L)
   class CachedFeaturizer[W](val base: IndexedSurfaceFeaturizer[W], cache: collection.mutable.Map[IndexedSeq[W], IndexedSurfaceAnchoring[W]]) extends IndexedSurfaceFeaturizer[W] with Serializable {
     def featurizer: SurfaceFeaturizer[W] = base.featurizer
-
     def featureIndex: Index[Feature] = base.featureIndex
-
     def anchor(datum: IndexedSeq[W]): IndexedSurfaceAnchoring[W] = cache.getOrElseUpdate(datum, base.anchor(datum))
   }
 
@@ -62,7 +59,7 @@ object IndexedSurfaceFeaturizer {
       val cons = constraintsFactory.constraints(words)
       val anch = featurizer.anchor(words)
       val spanFeatures = TriangularArray.tabulate(words.length+1){ (i, j) =>
-        if(cons(i,j) && i < j) {
+        if (cons(i,j) && i < j) {
           stripEncode(featureIndex, anch.featuresForSpan(i, j))
         } else {
           null
@@ -78,9 +75,9 @@ object IndexedSurfaceFeaturizer {
     val result = mutable.ArrayBuilder.make[Int]()
     result.sizeHint(features)
     var i = 0
-    while(i < features.length) {
+    while (i < features.length) {
       val fi = ind(features(i))
-      if(fi >= 0)
+      if (fi >= 0)
         result += fi
       i += 1
     }

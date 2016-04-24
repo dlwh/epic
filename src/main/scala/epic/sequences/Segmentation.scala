@@ -12,14 +12,12 @@ case class Segmentation[+L, +W](segments: IndexedSeq[(L, Span)],
                                 words: IndexedSeq[W],
                                 id: String = "") extends Example[IndexedSeq[(L, Span)], IndexedSeq[W]] {
 
-
   def render: String = {
     segmentsWithOutside.map {
       case (None, span) => words.slice(span.begin, span.end).mkString(" ")
       case (Some(l), span) => words.slice(span.begin, span.end).mkString(s"[$l: ", " ", "]")
     }.mkString(" ")
   }
-
 
   def features = words
 
@@ -40,7 +38,6 @@ case class Segmentation[+L, +W](segments: IndexedSeq[(L, Span)],
     var newSpanBegin = 0
 
     for (i <- 0 until length) {
-
 
       if (currentSegment < segments.length && segments(currentSegment)._2.end == i) {
         if (newSpanBegin != newOffset)
@@ -63,16 +60,14 @@ case class Segmentation[+L, +W](segments: IndexedSeq[(L, Span)],
     new Segmentation(newSegments, newWords, s"$id-filtered")
   }
 
-
   def segmentsWithOutside: Iterator[(Option[L], Span)] = {
     val segs = for {
       qq@IndexedSeq((pL, pSpan), (l, span)) <- (segments.headOption.map(pair => pair._1 -> Span(0, 0)).toIndexedSeq ++ segments).sliding(2)
       padding = Iterator.range(pSpan.end, span.begin).map(i => None -> Span(i, i + 1))
       pair <- padding ++ Iterator((Some(l), span))
     } yield {
-        pair
-      }
-
+      pair
+    }
 
     val lastSpanEnd = segments.lastOption match {
       case Some((_, Span(_, end))) => end
@@ -82,23 +77,21 @@ case class Segmentation[+L, +W](segments: IndexedSeq[(L, Span)],
     segs ++ (lastSpanEnd until length).map(i => None -> Span(i, i + 1))
   }
 
-
   def asBIOSequence[LL>:L](outsideLabel: LL): TaggedSequence[BIOETag[L], W] = {
     val outLabels = new ArrayBuffer[BIOETag[L]]()
     for((l,span) <- segments if !span.isEmpty) {
-      while(outLabels.length < span.begin) {
+      while (outLabels.length < span.begin) {
         outLabels += BIOETag.Outside
       }
-
-      if(l == outsideLabel)
+      if (l == outsideLabel)
         outLabels += BIOETag.Outside
       else
         outLabels += BIOETag.Begin(l)
       for(i <- (span.begin+1) until (span.end) ) {
-        outLabels += {if(l != outsideLabel) BIOETag.Inside(l) else BIOETag.Outside}
+        outLabels += {if (l != outsideLabel) BIOETag.Inside(l) else BIOETag.Outside}
       }
     }
-    while(outLabels.length < words.length) {
+    while (outLabels.length < words.length) {
       outLabels += BIOETag.Outside
     }
     assert(outLabels.length == words.length)
@@ -108,7 +101,7 @@ case class Segmentation[+L, +W](segments: IndexedSeq[(L, Span)],
   def asFlatTaggedSequence[LL>:L]: TaggedSequence[Option[LL], W] = {
     val outLabels = new ArrayBuffer[Option[LL]]()
     for((l,span) <- segments if !span.isEmpty) {
-      while(outLabels.length < span.begin) {
+      while (outLabels.length < span.begin) {
         outLabels += None
       }
 
@@ -116,7 +109,7 @@ case class Segmentation[+L, +W](segments: IndexedSeq[(L, Span)],
         outLabels += Some(l)
       }
     }
-    while(outLabels.length < words.length) {
+    while (outLabels.length < words.length) {
       outLabels += None
     }
     assert(outLabels.length == words.length)
@@ -127,15 +120,14 @@ case class Segmentation[+L, +W](segments: IndexedSeq[(L, Span)],
     val outLabels = new ArrayBuffer[(LL, Span)]()
     for((l,span) <- segments if !span.isEmpty) {
       val lastEnd = outLabels.lastOption.map(_._2.end).getOrElse(0)
-      if(lastEnd < span.begin) {
+      if (lastEnd < span.begin) {
         outLabels += (outsideLabel -> Span(lastEnd, span.begin))
       }
-
       outLabels += (l -> span)
     }
 
     val lastEnd = outLabels.lastOption.map(_._2.end).getOrElse(0)
-    if(lastEnd < words.length) {
+    if (lastEnd < words.length) {
       outLabels += (outsideLabel -> Span(lastEnd, words.length))
     }
 
@@ -154,20 +146,20 @@ object Segmentation {
     for(i <- 0 until seq.length) {
       seq.label(i) match {
         case Begin(l) =>
-          if(currentStart < i)
+          if (currentStart < i)
             spans += (currentLabel -> Span(currentStart, i))
           currentStart = i
           currentLabel = l
         case Inside(l) =>
-          if(currentLabel != l) {
-            if(currentStart < i)
+          if (currentLabel != l) {
+            if (currentStart < i)
               spans += (currentLabel -> Span(currentStart, i))
             currentStart = i
             currentLabel = l
           }
         case End(l) =>
-          if(currentLabel != l) {
-            if(currentStart < i)
+          if (currentLabel != l) {
+            if (currentStart < i)
               spans += (currentLabel -> Span(currentStart, i))
             currentStart = i
             currentLabel = l
@@ -175,18 +167,17 @@ object Segmentation {
           spans += (currentLabel -> Span(currentStart, i+1))
           currentStart = i + 1
         case Outside =>
-          if(currentLabel != outsideLabel) {
-            if(currentStart < i)
+          if (currentLabel != outsideLabel) {
+            if (currentStart < i)
               spans += (currentLabel -> Span(currentStart, i))
             currentStart = i
             currentLabel = outsideLabel
           }
           spans += (currentLabel -> Span(currentStart, i+1))
           currentStart = i + 1
-
       }
     }
-    if(currentStart < seq.length)
+    if (currentStart < seq.length)
       spans += (currentLabel -> Span(currentStart, seq.length))
     Segmentation(spans, seq.words, seq.id.replaceAll("-bio","-seg"))
   }

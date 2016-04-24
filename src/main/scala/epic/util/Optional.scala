@@ -18,11 +18,7 @@ case class Provided[A](value: A) extends Optional[A]
 case object NotProvided extends Optional[Nothing]
 
 object Optional {
-
   implicit def anyToOptional[A](x: A): Optional[A] = if (x == null) NotProvided else Provided(x)
-
   implicit def optionToOptional[A](x: Option[A]): Optional[A] = x.fold(NotProvided:Optional[A])(Provided(_))
-
   implicit def optionalToOption[A](x: Optional[A]): Option[A] = x.toOption
-  
 }

@@ -2,7 +2,6 @@ package epic.features
 
 import scala.collection.mutable.HashMap
 
-
 /**
  * HackyHeadFinders find "heads" in a span using only preterminal labels.
  * It doesn't use the syntactic structure of the sentence.
@@ -52,7 +51,7 @@ object RuleBasedHackyHeadFinder {
   headRules.put("PRN", (preterminals) => if (preterminals.size > 1) 1 else 0)
   headRules.put("S", (preterminals) => searchFindFirst(preterminals, L2R, Set("TO", "VBD", "VBN", "MD", "VBZ", "VB", "VBG", "VBP")))
   headRules.put("VP", (preterminals) => searchFindFirst(preterminals, L2R, Set("TO", "VBD", "VBN", "MD", "VBZ", "VB", "VBG", "VBP")))
-//  headRules.put("SBAR", (preterminals) => searchFindFirst(preterminals, L2R, Set("WP", "WP$", "WDT", "WRB", "IN", "PRP", "PRP$")));
+  // headRules.put("SBAR", (preterminals) => searchFindFirst(preterminals, L2R, Set("WP", "WP$", "WDT", "WRB", "IN", "PRP", "PRP$")));
   
   def searchFindFirst(preterminals: Seq[String], leftToRight: Boolean, goodOnes: Set[String]): Int = {
     val start = if (leftToRight) 0 else preterminals.size - 1
@@ -88,7 +87,7 @@ object RuleBasedHackyHeadFinder {
       }
     }
     if (headIdx == -1) {
-//      headIdx = if (leftToRight) preterminals.size - 1 else 0;
+    // headIdx = if (leftToRight) preterminals.size - 1 else 0;
       headIdx = if (leftToRight) Math.max(0, i - 1) else Math.min(i+1, preterminals.size)
     }
     if (headIdx < 0 || headIdx >= preterminals.size) {

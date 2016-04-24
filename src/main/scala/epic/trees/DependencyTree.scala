@@ -7,7 +7,7 @@ package epic.trees
 case class DependencyTree[+L, +W](dependencies: IndexedSeq[(L, Int)], words: IndexedSeq[W]) {
   def render : String = {
     for(((label, head),dep) <- dependencies.zipWithIndex) yield {
-      if(head == words.length) s"ROOT(${words(dep)}-$dep)" else s"$label(${words(head)}-$head, ${words(dep)}-$dep)"
+      if (head == words.length) s"ROOT(${words(dep)}-$dep)" else s"$label(${words(head)}-$head, ${words(dep)}-$dep)"
     }
   }.mkString("\n")
 

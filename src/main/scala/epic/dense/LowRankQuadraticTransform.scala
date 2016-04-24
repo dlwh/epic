@@ -21,10 +21,10 @@ case class LowRankQuadraticTransform[FV](numOutputs: Int, numRanks: Int, numLeft
     new OutputLayer(subTransforms, innerLayer) -> innerLayer
   }
   
-//  def extractLayer(weights: DenseVector[Double]) = {
-//    val subTransforms = (0 until neurons.size).map(i => neurons(i).extractLayer(weights(neuronIndex.componentOffset(i) until neuronIndex.componentOffset(i) + neuronIndex.indices(i).size)))
-//    new Layer(subTransforms, innerTransform.extractLayer(weights(index.componentOffset(1) to -1)))
-//  }
+  //  def extractLayer(weights: DenseVector[Double]) = {
+  //    val subTransforms = (0 until neurons.size).map(i => neurons(i).extractLayer(weights(neuronIndex.componentOffset(i) until neuronIndex.componentOffset(i) + neuronIndex.indices(i).size)))
+  //    new Layer(subTransforms, innerTransform.extractLayer(weights(index.componentOffset(1) to -1)))
+  //  }
   
   def initialWeightVector(initWeightsScale: Double, rng: Random, outputLayer: Boolean, spec: String) = {
     val subVects = DenseVector.vertcat(neurons.map(_.initialWeightVector(initWeightsScale, rng, outputLayer, spec)):_*) 

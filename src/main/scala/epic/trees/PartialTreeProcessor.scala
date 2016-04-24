@@ -7,7 +7,7 @@ case class PartialTreeProcessor() {
  
   def apply(tree: Tree[String]):Tree[String] = {
     var transformed = xox(ens(tree).get)
-    transformed = if(transformed.children.length != 1) {
+    transformed = if (transformed.children.length != 1) {
       Tree("", IndexedSeq(transformed), transformed.span)
     } else {
       transformed

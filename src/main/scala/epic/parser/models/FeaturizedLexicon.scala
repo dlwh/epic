@@ -26,7 +26,6 @@ import epic.lexicon.TagScorer
 class FeaturizedLexicon[L, L2, W](val weights: DenseVector[Double],
                                   val featureIndexer: IndexedFeaturizer[L, L2, W]) extends TagScorer[L2, W] {
 
-
   def anchor(w: IndexedSeq[W]): Anchoring = new Anchoring {
     val fi = featureIndexer.anchor(w)
     def words: IndexedSeq[W] = w

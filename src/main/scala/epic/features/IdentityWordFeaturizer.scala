@@ -19,7 +19,7 @@ class IdentityWordFeaturizer[W](wordCounts: Counter[W, Double], unknownWordThres
       def words = w
 
       def featuresForWord(pos: Int): Array[Feature] = {
-        if(pos < 0 || pos >= words.length) {
+        if (pos < 0 || pos >= words.length) {
           boundaryFeatures
         } else {
            _minimalFeatures(pos)
@@ -28,7 +28,7 @@ class IdentityWordFeaturizer[W](wordCounts: Counter[W, Double], unknownWordThres
 
       private val _minimalFeatures: immutable.IndexedSeq[Array[Feature]] = words.indices.map { i =>
         val index = indices(i)
-        if(index >= 0) {
+        if (index >= 0) {
           IdentityWordFeaturizer.this.minimalFeatures(index)
         } else {
           Array[Feature](Unk)
@@ -42,14 +42,13 @@ class IdentityWordFeaturizer[W](wordCounts: Counter[W, Double], unknownWordThres
   private val wordIndex = Index(wordCounts.keySet)
   private val Unk = WordFeature("#UNK#", 'LowCount)
   private val boundaryFeatures = Array[Feature](BoundaryFeature)
-
-  private val wordFeatures = Encoder.fromIndex(wordIndex).tabulateArray(s => if(wordCounts(s) > unknownWordThreshold) IndicatorFeature(s) else Unk)
+  private val wordFeatures = Encoder.fromIndex(wordIndex).tabulateArray(s => if (wordCounts(s) > unknownWordThreshold) IndicatorFeature(s) else Unk)
 
   // caches
   private val minimalFeatures = Array.tabulate[Array[Feature]](wordIndex.size){ i =>
     val wc = wordCounts(wordIndex.get(i))
     val w = wordFeatures(i)
-    if(wc > unknownWordThreshold) {
+    if (wc > unknownWordThreshold) {
       Array(w)
     } else {
       Array(Unk)

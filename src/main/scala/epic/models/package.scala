@@ -12,7 +12,7 @@ import scala.util.{Success, Try}
  **/
 package object models {
 
-  def deserialize[T](model: String):T = deserialize[T](model, new File(System.getProperty("user.dir")))
+  def deserialize[T](model: String): T = deserialize[T](model, new File(System.getProperty("user.dir")))
 
   def readFromJar[T](model: String, file: File): T = {
     val zip = new ZipFile(file)
@@ -20,9 +20,7 @@ package object models {
       case e if e.getName == model || e.getName.endsWith("model.ser.gz") =>
         breeze.util.nonstupidObjectInputStream(new GZIPInputStream(zip.getInputStream(e))).readObject().asInstanceOf[T]
     }
-
     obj.getOrElse(throw new RuntimeException(s"Could not find model $model in jar $file"))
-
   }
 
   /**
@@ -33,10 +31,10 @@ package object models {
    * @tparam T
    * @return
    */
-  def deserialize[T](model: String, path: File):T = {
-    if(!path.exists()) {
+  def deserialize[T](model: String, path: File): T = {
+    if (!path.exists()) {
       throw new FileNotFoundException(path.toString)
-    } else if(!path.isDirectory) {
+    } else if (!path.isDirectory) {
       try {
         readFromJar(model, path)
       } catch {
@@ -60,7 +58,6 @@ package object models {
                 case ex: Exception =>
                   throw new RuntimeException(s"Could not find model $model in path $path", ex)
               }
-
           }
         case None =>
           // look for jar files, try to read from there
@@ -71,12 +68,8 @@ package object models {
           }.collectFirst { case Success(r) => r }.getOrElse {
             throw new RuntimeException(s"Could not find model $model in path $path")
           }
-
       }
-
     }
-
   }
-
 
 }

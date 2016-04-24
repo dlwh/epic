@@ -133,7 +133,7 @@ object SplitSpanFeaturizer {
     }
 
     def anchor(w: IndexedSeq[W]): SplitSpanFeatureAnchoring[W] = {
-      if(a.isInstanceOf[SplitPointMarker] || b.isInstanceOf[SplitPointMarker])
+      if (a.isInstanceOf[SplitPointMarker] || b.isInstanceOf[SplitPointMarker])
         theSplitNeedingAnchoring
       else
         theNotSplitNeedingAnchoring
@@ -214,11 +214,11 @@ object SplitSpanFeaturizer {
         val afeats: Array[Feature] = aa.featuresForSpan(begin, end)
         val bfeats: Array[Feature] = ba.featuresForSpan(begin, end)
         val cross:Array[Feature] = Arrays.crossProduct(afeats, bfeats)(CrossProductFeature(_, _))
-        if(keepJustA && keepJustB) {
+        if (keepJustA && keepJustB) {
           Arrays.concatenate[Feature](cross, afeats, bfeats)
         } else if (keepJustA) {
           Arrays.concatenate[Feature](cross, afeats)
-        } else if(keepJustB) {
+        } else if (keepJustB) {
           Arrays.concatenate[Feature](cross, bfeats)
         } else {
           cross
@@ -237,10 +237,10 @@ object SplitSpanFeaturizer {
           Arrays.crossProduct(aSpan, bSplit)(CrossProductFeature(_, _, "Split"))
         )
 
-        if(keepJustA) {
+        if (keepJustA) {
           results += aSplit
         }
-        if(keepJustB) {
+        if (keepJustB) {
           results += bSplit
         }
 
@@ -255,7 +255,6 @@ object SplitSpanFeaturizer {
 trait SplitSpanFeatureAnchoring[W] extends SurfaceFeatureAnchoring[W] {
   def featuresForSplit(begin: Int, split: Int, end: Int):Array[Feature]
 }
-
 
 trait IndexedSplitSpanFeaturizer[W] {
   def anchor(w: IndexedSeq[W]):IndexedSplitSpanFeatureAnchoring[W]
@@ -272,8 +271,8 @@ object IndexedSplitSpanFeaturizer {
                      hashFeatures: HashFeature.Scale = HashFeature.Relative(1.0),
                      bloomFilter: Boolean = false,
                      deduplicateFeatures: Boolean = false):IndexedSplitSpanFeaturizer[W] =  {
-    def seenSet =  if(bloomFilter) new ThreadLocalBloomFilter[Long](8 * 1024 * 1024 * 50, 3) else AlwaysSeenSet
-    val builder = if(deduplicateFeatures) new NonRedundantIndexBuilder[Feature] else new NormalIndexBuilder[Feature]
+    def seenSet =  if (bloomFilter) new ThreadLocalBloomFilter[Long](8 * 1024 * 1024 * 50, 3) else AlwaysSeenSet
+    val builder = if (deduplicateFeatures) new NonRedundantIndexBuilder[Feature] else new NormalIndexBuilder[Feature]
     for (ti <- trees) {
       val wspec = f.anchor(ti.words)
       ti.tree.allChildren.foreach {
@@ -286,7 +285,7 @@ object IndexedSplitSpanFeaturizer {
 
     val index = builder.result()
 
-    new BasicIndexedSplitSpanFeaturizer(f, if(hashFeatures.numFeatures(index.size) != 0) new HashExtendingIndex(index, HashFeature(_), hashFeatures, seenSet) else index)
+    new BasicIndexedSplitSpanFeaturizer(f, if (hashFeatures.numFeatures(index.size) != 0) new HashExtendingIndex(index, HashFeature(_), hashFeatures, seenSet) else index)
   }
 
   class BasicIndexedSplitSpanFeaturizer[W](f: SplitSpanFeaturizer[W], val featureIndex: Index[Feature]) extends IndexedSplitSpanFeaturizer[W] with Serializable {

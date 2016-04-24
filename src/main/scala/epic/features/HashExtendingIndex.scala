@@ -23,7 +23,7 @@ class HashExtendingIndex[T](val baseIndex: Index[T],
   def apply(t: T): Int = baseIndex(t) match {
     case -1 =>
       val code = t.##.abs
-      if(!cache.addOrSeen(code))
+      if (!cache.addOrSeen(code))
         -1
       else
         t.##.abs % numHashFeatures + baseIndex.size
@@ -31,8 +31,8 @@ class HashExtendingIndex[T](val baseIndex: Index[T],
   }
 
   def unapply(i: Int): Option[T] = {
-    if(i < baseIndex.size) baseIndex.unapply(i)
-    else if(i < size) Some(hashWrapper(i - baseIndex.size))
+    if (i < baseIndex.size) baseIndex.unapply(i)
+    else if (i < size) Some(hashWrapper(i - baseIndex.size))
     else  None
   }
 

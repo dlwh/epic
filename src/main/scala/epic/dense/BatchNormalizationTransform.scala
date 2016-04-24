@@ -87,8 +87,8 @@ case class BatchNormalizationTransform[FV](size: Int, useBias: Boolean, inner: T
       val mean = allActivations.reduce(_ + _) * (1.0/inputs.size)
       val variances = allActivations.map(act => (act - mean) :* (act - mean)).reduce(_ + _) * (1.0/inputs.size)
       val invStdDevs = variances.data.map(variance => 1.0/Math.sqrt(variance + 1e-6))
-//      println(mean.data.toSeq)
-//      println(invStdDevs.toSeq)
+      // println(mean.data.toSeq)
+      // println(invStdDevs.toSeq)
       fcn = new NonlinearTransform.ShiftAndScaleEach(mean.data, invStdDevs)
       innerLayer.applyBatchNormalization(inputs)
     }

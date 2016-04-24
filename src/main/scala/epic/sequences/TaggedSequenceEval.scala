@@ -17,7 +17,7 @@ object TaggedSequenceEval {
       val myStats = evaluateExample(guess, gold)
 
       val sent = for( ((p,g),w) <- guess.label zip gold.label zip guess.words) yield if (g == p) s"$w/$g" else s"$w/[G:$g,P:$p]"
-      if(myStats.exact != 1)
+      if (myStats.exact != 1)
         println(sent.mkString(" ") + "\n" + myStats)
       stats + myStats
     }, {_ + _})
@@ -28,7 +28,7 @@ object TaggedSequenceEval {
     val confusion = Counter2({for( (p, g) <- guess.tags zip gold.tags if p != g) yield (p,g,1)}:_*)
     val nRight = guess.length - confusion.size
     val nTotal = guess.length
-    val myStats = new Stats(nRight, nTotal, if(nRight == nTotal) 1 else 0, 1, confusion)
+    val myStats = new Stats(nRight, nTotal, if (nRight == nTotal) 1 else 0, 1, confusion)
     myStats
   }
 

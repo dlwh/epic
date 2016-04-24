@@ -62,17 +62,12 @@ final case class Parser[L,W](topology: RuleTopology[L],
       }
   }
 
-
-
-
-
 }
 
 object Parser {
 
   def apply[L, W](grammar: Grammar[L, W])(implicit deb: Debinarizer[L]): Parser[L, W]= {
     Parser(grammar.topology, grammar.lexicon, ChartConstraints.Factory.noSparsity, StandardChartFactory(grammar), ChartDecoder())
-
   }
 
   def apply[L, W](refined: Grammar[L, W], decoder: ChartDecoder[L, W])(implicit deb: Debinarizer[L]): Parser[L, W] = {
@@ -82,7 +77,6 @@ object Parser {
   def apply[L, L2, W](refinedGrammar: SimpleGrammar[L, L2, W], decoder: ChartDecoder[L, W])(implicit deb: Debinarizer[L]): Parser[L, W] = {
     new Parser(refinedGrammar.topology, refinedGrammar.lexicon, ChartConstraints.Factory.noSparsity[L, W], new SimpleChartMarginal.SimpleChartFactory(refinedGrammar, decoder.wantsMaxMarginal), decoder)
   }
-
 
   def apply[L, W](core: ChartConstraints.Factory[L, W], grammar: Grammar[L, W], decoder: ChartDecoder[L, W])(implicit deb: Debinarizer[L]): Parser[L, W] = {
     Parser(grammar.topology, grammar.lexicon, core, StandardChartFactory(grammar, decoder.wantsMaxMarginal), decoder)

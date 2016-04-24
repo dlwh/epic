@@ -86,12 +86,10 @@ class HackyLexicalProductionFeaturizer(wordTagCounts: Counter2[String, String, D
                                RightTagDistanceRuleFeature(rule, rcHeadTag, distance),
                                RightHeadDistanceRuleFeature(rule, if (wordCounts(rcHeadWord) >= wordThreshold) rcHeadWord else HackyLexicalProductionFeaturizer.RareToken, distance)))
     }
-    
-    
+
     def featuresForUnaryRule(begin: Int, end: Int, rule: Int, ref: Int):Array[Feature] = emptyArray
     def featuresForSpan(begin: Int, end: Int, tag: Int, ref: Int):Array[Feature] = emptyArray
   }
-
 
 }
 
@@ -100,7 +98,6 @@ case class LeftHeadDistanceRuleFeature(rule: Int, lsuff: String, distance: Int) 
 case class RightTagDistanceRuleFeature(rule: Int, rtag: String, distance: Int) extends Feature
 case class RightHeadDistanceRuleFeature(rule: Int, rsuff: String, distance: Int) extends Feature
 case class HeadPairDistanceRuleFeature(rule: Int, lsuff: String, rsuff: String, distance: Int) extends Feature
-
 
 object HackyLexicalProductionFeaturizer {
   val UnkTag = "NN"

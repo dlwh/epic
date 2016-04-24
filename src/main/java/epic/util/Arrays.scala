@@ -48,9 +48,9 @@ object Arrays {
     val ret = new Array[C](arr1.length * arr2.length)
     var off = 0
     var i = 0
-    while(i < arr1.length) {
+    while (i < arr1.length) {
       var j = 0
-      while(j < arr2.length) {
+      while (j < arr2.length) {
         ret(off) = f(arr1(i), arr2(j))
         off += 1
         j += 1
@@ -65,9 +65,9 @@ object Arrays {
     val ret = new Array[Int](arr1.length * arr2.length)
     var off = 0
     var i = 0
-    while(i < arr1.length) {
+    while (i < arr1.length) {
       var j = 0
-      while(j < arr2.length) {
+      while (j < arr2.length) {
         ret(off) = arr1(i) + arr2(j) * secondScale
         off += 1
         j += 1

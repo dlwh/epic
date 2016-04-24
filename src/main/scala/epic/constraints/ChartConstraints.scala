@@ -19,29 +19,26 @@ import java.io.{DataOutput, DataInput}
 case class ChartConstraints[L](top: LabeledSpanConstraints[L],
                                 bot: LabeledSpanConstraints[L]) extends SpanConstraints with Serializable {
 
-
-  def isAllowedSpan(begin: Int, end: Int):Boolean = top.isAllowedSpan(begin, end) || bot.isAllowedSpan(begin, end)
+  def isAllowedSpan(begin: Int, end: Int): Boolean = top.isAllowedSpan(begin, end) || bot.isAllowedSpan(begin, end)
   /** TODO */ // TODO
-  def hasMaximalLabel(begin: Int, end: Int):Boolean = ???
-
+  def hasMaximalLabel(begin: Int, end: Int): Boolean = ???
 
   def maxSpanLengthStartingAt(begin: Int): Int = top.maxSpanLengthStartingAt(begin) max bot.maxSpanLengthStartingAt(begin)
 
   def flatten = top | bot
-  def &(other: ChartConstraints[L]) = if(this eq other) this else ChartConstraints(top & other.top, bot & other.bot)
+  def &(other: ChartConstraints[L]) = if (this eq other) this else ChartConstraints(top & other.top, bot & other.bot)
   def |(other: ChartConstraints[L]) = ChartConstraints(top | other.top, bot | other.bot)
-
 
 }
 
 object ChartConstraints {
+
   def noSparsity[L]: ChartConstraints[L] = ChartConstraints[L](LabeledSpanConstraints.noConstraints[L], LabeledSpanConstraints.noConstraints[L])
 
   def apply[L](top: TriangularArray[_ <: BitSet], bot: TriangularArray[_ <: BitSet]): ChartConstraints[L] = ChartConstraints(LabeledSpanConstraints(top), LabeledSpanConstraints(bot))
 
   trait Factory[L, W] extends SpanConstraints.Factory[W] {
     def constraints(w: IndexedSeq[W]): ChartConstraints[L]
-
     def |(cf: Factory[L, W]) = new OrFactory(this, cf)
   }
 
@@ -82,10 +79,8 @@ object ChartConstraints {
       case _ =>
         bot(t.begin,t.end) = BitSet(labelIndex(t.label))
     }
-
     ChartConstraints(LabeledSpanConstraints(top), LabeledSpanConstraints(bot))
   }
-
 
   implicit def serializerChartConstraints[L]:Serializer[ChartConstraints[L]] = new Serializer[ChartConstraints[L]] with Serializable {
     def serialize(out: DataOutput, value: ChartConstraints[L]) {
@@ -98,6 +93,6 @@ object ChartConstraints {
       val bot = implicitly[Serializer[LabeledSpanConstraints[L]]].deserialize(in, available)
       ChartConstraints(top, bot)
     }
-
   }
+
 }

@@ -112,8 +112,6 @@ You can also epic.trees.annotations.KMAnnotator to get more or less Klein and Ma
   
   type MyModel = PositionalNeuralModel[AnnotatedLabel, AnnotatedLabel, String]
 
-
-
   override def make(trainTrees: IndexedSeq[TreeInstance[AnnotatedLabel, String]],
                     topology: RuleTopology[AnnotatedLabel],
                     lexicon: Lexicon[AnnotatedLabel, String],
@@ -141,7 +139,6 @@ You can also epic.trees.annotations.KMAnnotator to get more or less Klein and Ma
 
     val prodFeaturizer = new ProductionFeaturizer[AnnotatedLabel, AnnotatedLabel, String](xbarGrammar, indexedRefinements, lGen=labelFeaturizer, rGen=ruleFeaturizer)
 
-    
     ///////////////////////
     // READ IN WORD VECTORS
     val tagCountsLexicon = TagSpanShapeGenerator.makeStandardLexicon(annTrees)
@@ -163,7 +160,7 @@ You can also epic.trees.annotations.KMAnnotator to get more or less Klein and Ma
     }
     // Convert Array[Float] values to Array[Double] values and rescale them
     val word2vecDoubleVect = word2vec.map(keyValue => keyValue._1 -> keyValue._2.map(_.toDouble * vectorRescaling))
-//    val word2vecDoubleVect = word2vec.map(keyValue => (keyValue._1 -> new DenseVector[Double](keyValue._2.map(_.toDouble))))
+    // val word2vecDoubleVect = word2vec.map(keyValue => (keyValue._1 -> new DenseVector[Double](keyValue._2.map(_.toDouble))))
     val word2vecIndexed: Word2VecIndexed[String] = if (embeddingType == "normalpos") {
       Word2VecIndexed(word2vecDoubleVect, (str: String) => Word2Vec.convertWord(str, lowercasedVectors)).augment(freqTagger.tagTypesIdx.size, freqTagger.convertToFeaturizer)
     } else {
@@ -229,7 +226,7 @@ You can also epic.trees.annotations.KMAnnotator to get more or less Klein and Ma
         annotator.latent,
         indexedRefinements,
         xbarGrammar,
-        if(dummyFeats < 0) HashFeature.Absolute(-dummyFeats.toInt) else HashFeature.Relative(dummyFeats),
+        if (dummyFeats < 0) HashFeature.Absolute(-dummyFeats.toInt) else HashFeature.Relative(dummyFeats),
         filterUnseenFeatures = false,
         minFeatCount = 1,
         trainTrees)
@@ -289,8 +286,7 @@ object PositionalNeuralModelFactory {
     val innerTransform = buildNetInnerTransforms(word2vecIndexed, inputSize, numHidden, numHiddenLayers, nonLinType, dropoutRate, backpropIntoEmbeddings)
     new AffineOutputTransform(outputSize, if (numHiddenLayers >= 1) numHidden else inputSize, innerTransform)
   }
-  
-  
+
   def buildNetOutputEmbedding(word2vecIndexed: Word2VecIndexed[String],
                               inputSize: Int,
                               numHidden: Int,

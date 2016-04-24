@@ -63,11 +63,10 @@ trait UnrefinedGrammarAnchoring[L, W] extends GrammarAnchoring[L, W] with Factor
   override def *(other: UnrefinedGrammarAnchoring[L, W]): UnrefinedGrammarAnchoring[L, W] = {
     // hacky multimethod dispatch is hacky
     if (other eq null) this // ugh
-    else if(other.isInstanceOf[UnrefinedGrammarAnchoring.Identity[L, W]]) this.addConstraints(other.sparsityPattern)
-    else if(this.isInstanceOf[UnrefinedGrammarAnchoring.Identity[L, W]]) other.addConstraints(this.sparsityPattern)
+    else if (other.isInstanceOf[UnrefinedGrammarAnchoring.Identity[L, W]]) this.addConstraints(other.sparsityPattern)
+    else if (this.isInstanceOf[UnrefinedGrammarAnchoring.Identity[L, W]]) other.addConstraints(this.sparsityPattern)
     else new ProductUnrefinedGrammarAnchoring(this,other)
   }
-
 
   /**
    * The annotationTag controls if two grammars are over the same refinements.
@@ -92,8 +91,8 @@ trait UnrefinedGrammarAnchoring[L, W] extends GrammarAnchoring[L, W] with Factor
   def /(other: UnrefinedGrammarAnchoring[L, W]) = {
     // hacky multimethod dispatch is hacky
     if (other eq null) this // ugh
-    else if(this eq other) new UnrefinedGrammarAnchoring.Identity[L, W](topology, lexicon, words, this.sparsityPattern)
-    else if(other.isInstanceOf[UnrefinedGrammarAnchoring.Identity[L, W]]) this.addConstraints(other.sparsityPattern)
+    else if (this eq other) new UnrefinedGrammarAnchoring.Identity[L, W](topology, lexicon, words, this.sparsityPattern)
+    else if (other.isInstanceOf[UnrefinedGrammarAnchoring.Identity[L, W]]) this.addConstraints(other.sparsityPattern)
     else new ProductUnrefinedGrammarAnchoring(this, other, -1)
   }
 
@@ -195,23 +194,11 @@ object UnrefinedGrammarAnchoring {
    */
   @SerialVersionUID(1L)
   case class Identity[L, W](topology: RuleTopology[L], lexicon: Lexicon[L, W], words: IndexedSeq[W], sparsityPattern: ChartConstraints[L]) extends UnrefinedGrammarAnchoring[L, W] {
-
-
     //  def sparsityPattern = ChartConstraints.noSparsity[L]
     override def addConstraints(cs: ChartConstraints[L]): UnrefinedGrammarAnchoring[L, W] = copy(sparsityPattern = sparsityPattern & cs)
-
     def scoreBinaryRule(begin: Int, split: Int, end: Int, rule: Int) = 0.0
-
     def scoreUnaryRule(begin: Int, end: Int, rule: Int) = 0.0
-
     def scoreSpan(begin: Int, end: Int, tag: Int) = 0.0
-
-
   }
 
 }
-
-
-
-
-
