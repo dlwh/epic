@@ -483,7 +483,7 @@ case class MarkPreterminals[W]() extends TreeAnnotator[AnnotatedLabel, W, Annota
     def rec(tree: BinarizedTree[AnnotatedLabel]):BinarizedTree[AnnotatedLabel] = tree match {
       case b@BinaryTree(label, lc, rc, span) => BinaryTree(label, rec(lc), rec(rc), span)
       case n@NullaryTree(label, span) => NullaryTree(label, span)
-      case u@UnaryTree(label, c, chain, span)  => {
+      case u@UnaryTree(label, c, chain, span) =>
         if (c.isLeaf) {
           UnaryTree(new AnnotatedLabel(label.label, label.headTag, label.parents, label.siblings, label.features ++ Set(new PreterminalAnnotation())),
                     c.relabelRoot(cLabel => new AnnotatedLabel(cLabel.label, cLabel.headTag, cLabel.parents, cLabel.siblings, cLabel.features ++ Set(new TagAnnotation()))),
@@ -492,7 +492,6 @@ case class MarkPreterminals[W]() extends TreeAnnotator[AnnotatedLabel, W, Annota
         } else {
           UnaryTree(label, rec(c), chain, span)
         }
-      }
     }
     rec(tree)
   }
