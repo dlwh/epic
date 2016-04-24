@@ -193,9 +193,6 @@ class IndexedLexFeaturizer[L, L2, W](grammar: RuleTopology[L],
           lcached = splitSpanFeatureIndex.crossProduct(spanFeats, getSpanFeatures(begin, end), splitOffset, true)
           labelCache(refinedTag) = lcached
         }
-        lcached
-
-
         cache = Arrays.concatenate(cache, lcached)
       }
       cache
