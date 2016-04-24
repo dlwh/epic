@@ -179,22 +179,19 @@ case class SplitAuxiliary() extends TreeAnnotator[AnnotatedLabel, String, Annota
   val hasVerbs = Set("has", "have", "had")
 
   def apply(tree: BinarizedTree[AnnotatedLabel], words: Seq[String]) = {
-    tree.extend { t =>
-      t match {
-        case UnaryTree(label, NullaryTree(lbl2, _), chain, span) if label.baseLabel == lbl2.baseLabel =>
-          val w = words(span.begin)
-          if (beVerbs.contains(w.toLowerCase)) label.annotate(AuxBe).annotate(Aux)
-          else if (hasVerbs.contains(w.toLowerCase)) label.annotate(AuxHave).annotate(Aux)
-          else label
-        case NullaryTree(label, span) =>
-          val w = words(span.begin)
-          if (beVerbs.contains(w.toLowerCase)) label.annotate(AuxBe).annotate(Aux)
-          else if (hasVerbs.contains(w.toLowerCase)) label.annotate(AuxHave).annotate(Aux)
-          else label
-        case _ => t.label
-      }
+    tree.extend {
+      case UnaryTree(label, NullaryTree(lbl2, _), chain, span) if label.baseLabel == lbl2.baseLabel =>
+        val w = words(span.begin)
+        if (beVerbs.contains(w.toLowerCase)) label.annotate(AuxBe).annotate(Aux)
+        else if (hasVerbs.contains(w.toLowerCase)) label.annotate(AuxHave).annotate(Aux)
+        else label
+      case NullaryTree(label, span) =>
+        val w = words(span.begin)
+        if (beVerbs.contains(w.toLowerCase)) label.annotate(AuxBe).annotate(Aux)
+        else if (hasVerbs.contains(w.toLowerCase)) label.annotate(AuxHave).annotate(Aux)
+        else label
+      case t => t.label
     }
-
   }
 
 }
