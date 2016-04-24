@@ -253,14 +253,14 @@ case class SplitIN[W]() extends TreeAnnotator[AnnotatedLabel, W, AnnotatedLabel]
       val blbl = tree.label.baseLabel
       tree match {
         case tree@NullaryTree(lbl, span) if blbl == "IN" =>
-        if(grandParent.isEmpty || grandParent.exists(_ == root) || parent.exists(_ == root)) {
+        if(grandParent.isEmpty || grandParent.contains(root) || parent.contains(root)) {
           tree
         } else if (grandParent.exists(_(0) == 'N') && parent.exists(s => s(0) == 'P' || s(0) == 'A')) {
           tree.copy(lbl.annotate(IN_N), span)
         } else if (parent.exists(_(0) == 'Q') && grandParent.exists(s => s(0) == 'N' || s.startsWith("ADJP"))) {
           tree.copy(lbl.annotate(IN_Q), span)
-        } else if(grandParent.exists(_ == "S")) {
-          if(parent.exists(_ == "SBAR")) {
+        } else if(grandParent.contains("S")) {
+          if(parent.contains("SBAR")) {
             tree.copy(lbl.annotate(IN_SCC), span)
           } else {
             tree.copy(lbl.annotate(IN_SC), span)
