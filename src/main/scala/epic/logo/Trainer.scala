@@ -157,12 +157,10 @@ object Trainer {
       val trainer = newL1MaxMarginTrainer(new MulticlassOneSlackOracleInferencer(oracler),
         new MulticlassOneSlackLossAugmentedArgmaxInferencer(argmaxer, initialConstraint),
         oneSlackIterCallBack, C, maxNumIters, opts)
-      trainer.train(Seq(new Instance(data)),
-        new Weights(space.zeroLike(initialConstraint)))
+      trainer.train(Seq(data), new Weights(space.zeroLike(initialConstraint)))
     } else {
       val trainer = newL1MaxMarginTrainer(oracler, argmaxer, iterationCallback, C, maxNumIters, opts)
-      trainer.train(data.map(new Instance[LabeledDatum[L, F], W](_)),
-        new Weights(space.zeroLike(initialConstraint)))
+      trainer.train(data, new Weights(space.zeroLike(initialConstraint)))
     }
     new MulticlassClassifier[L, F, W](weights, argmaxer)
   }
@@ -182,7 +180,8 @@ case class Trainer[T, W](convergenceChecker: ConvergenceChecker[W],
   final val numInnerOptimizationLoops = if (online) 1 else opts.numInnerOptimizationLoops
   final val numOuterOptimizationLoops = if (online) 0 else opts.numOuterOptimizationLoops
 
-  def train(data : Seq[Instance[T, W]], initWeights : Weights[W]) = {
+  def train(rawData : Seq[T], initWeights : Weights[W]) = {
+    val data = rawData.map(datum => Instance[T, W](datum))
     val n = data.length
     val w = if (online) initWeights else {
       if (initWeights.norm != 0.0) {
