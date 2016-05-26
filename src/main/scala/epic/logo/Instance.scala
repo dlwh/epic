@@ -9,5 +9,5 @@ class Instance[T, W](val x : T) {
   var slack = new DoubleRef(0.0)
 
   val alphas = new ArrayBuffer[Double]() //(1.0)
-  val constraints = new ArrayBuffer[(FeatureVector[W], Double)]()
+  val constraints = new ArrayBuffer[(W, Double)]()
 }

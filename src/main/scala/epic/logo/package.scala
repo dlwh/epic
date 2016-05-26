@@ -7,5 +7,4 @@ package object logo {
   }
 
   type LabeledDatum[L, W] = epic.framework.Example[L, W]
-
 }

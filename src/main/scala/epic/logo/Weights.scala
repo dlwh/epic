@@ -4,11 +4,11 @@ import java.util.Arrays
 import breeze.linalg._
 import breeze.math.MutableInnerProductModule
 
-class Weights[W](var array: W, var scale : Double = 1.0)(implicit space: MutableInnerProductModule[W, Double]) {
+class Weights[W](var underlying: W, var scale : Double = 1.0)(implicit space: MutableInnerProductModule[W, Double]) {
 
   import space._
   var norm = calcNormSquared
-  private def calcNormSquared = (array dot array) * scale * scale
+  private def calcNormSquared = (underlying dot underlying) * scale * scale
 
   def checkNorm = {
     val calcNorm = calcNormSquared
@@ -19,10 +19,10 @@ class Weights[W](var array: W, var scale : Double = 1.0)(implicit space: Mutable
     breeze.linalg.norm(compile - w.compile) < 1e-5
   }
 
-  def compile: W = array * scale
+  def compile: W = underlying * scale
 
   override def toString() : String = {
-    scale + "*" + array
+    scale + "*" + underlying
   }
 
   def *=(d : Double) = {
@@ -30,25 +30,25 @@ class Weights[W](var array: W, var scale : Double = 1.0)(implicit space: Mutable
     norm *= sq(d)
   }
 
-  def *(fv : FeatureVector[W]) = {
-    array dot fv.data
+  def *(fv : W) = {
+    scale * (underlying dot fv)
   }
 
-  def +=(fv : FeatureVector[W]) = increment(fv, 1.0)
+  def +=(fv : W) = increment(fv, 1.0)
 
-  private def increment(fv: FeatureVector[W], d: Double) = {
-    norm += sq(d / scale) * fv.normSquared()
-    norm += 2 * d * (fv * this)
-    axpy(d / scale, fv.data, array)
+  private def increment(fv: W, d: Double) = {
+    norm += sq(d / scale) * (fv dot fv)
+    norm += 2 * d * (fv dot underlying) / scale
+    axpy(d / scale, fv, underlying)
   }
 
   private final def sq(d : Double) = d * d
 
   def increment(w : Weights[W], d : Double) = {
-    array += w.array * w.scale * d
+    underlying += w.underlying * w.scale * d
   }
 
-  def -=(fv : FeatureVector[W]) = {
+  def -=(fv : W) = {
     increment(fv, -1.0)
 
   }
@@ -57,6 +57,6 @@ class Weights[W](var array: W, var scale : Double = 1.0)(implicit space: Mutable
 
 
   def zeroOut() = {
-    array = space.zeroLike.apply(array)
+    underlying = space.zeroLike.apply(underlying)
   }
 }

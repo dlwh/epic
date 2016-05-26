@@ -1,13 +1,15 @@
 package epic.logo
 import scala.collection.mutable.Buffer
 import scala.runtime.DoubleRef
+import breeze.linalg.norm
+import breeze.math.MutableInnerProductModule
 
-class PegasosUpdater[W](C : Double) extends Updater[W] {
-
-  def update(constraints : IndexedSeq[(FeatureVector[W], Double)], alphas : Buffer[Double], slack : DoubleRef, w : Weights[W], n : Int, iter : Int) : Boolean = {
+class PegasosUpdater[W](C : Double)(implicit space: MutableInnerProductModule[W, Double]) extends Updater[W] {
+  import space._
+  def update(constraints : IndexedSeq[(W, Double)], alphas : Buffer[Double], slack : DoubleRef, w : Weights[W], n : Int, iter : Int) : Boolean = {
     assert(constraints.length == 2)
     val (df, _) = constraints(0)
-    if ((df ^ 2) == 0.0) return false
+    if (norm(df) == 0.0) return false
     val t = iter + 1
     val lambda = 2.0 / C
     val eta = 1.0 / lambda / t

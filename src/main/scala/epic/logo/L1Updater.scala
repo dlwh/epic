@@ -3,11 +3,13 @@ package epic.logo
 import scala.collection.mutable.Buffer
 import scala.runtime.DoubleRef
 import scala.util.Random
+import breeze.math.MutableInnerProductModule
 
-class L1Updater[W](C : Double) extends Updater[W] {
-   val shuffleRand = new Random()
+class L1Updater[W](C : Double)(implicit space: MutableInnerProductModule[W, Double]) extends Updater[W] {
+  val shuffleRand = new Random()
+  import space._
 
-  def update(constraints : IndexedSeq[(FeatureVector[W], Double)], alphas : Buffer[Double], slack : DoubleRef, w : Weights[W], n : Int, iter : Int) : Boolean = {
+  def update(constraints : IndexedSeq[(W, Double)], alphas : Buffer[Double], slack : DoubleRef, w : Weights[W], n : Int, iter : Int) : Boolean = {
     if (constraints.length == 1) {
       if (alphas(0) != C) {
         val eta = C - alphas(0)
@@ -28,7 +30,7 @@ class L1Updater[W](C : Double) extends Updater[W] {
         val diff = df2 - df1
         val num = (l2 - l1) - w * diff
         if (num != 0.0) {
-          val denom = diff ^ 2
+          val denom = diff dot diff
           if (denom != 0.0) {
             val eta = clip(num / denom, -alphas(s2), +alphas(s1))
             if (eta != 0.0) {

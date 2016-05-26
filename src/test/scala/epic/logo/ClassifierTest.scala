@@ -30,7 +30,7 @@ class ClassifierTest extends FunSuite {
         Counter(f.toMap.map { case (k, v) => ((label, k), v) })),
       C = 1000.0,
       oneSlackFormulation = false,
-      initialConstraint = FeatureVector(Counter[(Boolean, Int), Double]()))
+      initialConstraint = Counter[(Boolean, Int), Double]())
 
     for(x <- trainingData) {
       assert(x.label == c(x.features), x)

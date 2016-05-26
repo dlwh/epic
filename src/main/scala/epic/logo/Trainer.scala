@@ -16,7 +16,7 @@ object Trainer {
                                   iterationCallback : IterationCallback[T, W] = NullIterationCallback[T, W](),
                                   C : Double = 1.0,
                                   maxNumIters : Int = 100, opts : LogoOpts = new LogoOpts(),
-                                  addInitialConstraint : Option[FeatureVector[W]] = None)(implicit space: MutableInnerProductModule[W, Double]) =
+                                  addInitialConstraint : Option[W] = None)(implicit space: MutableInnerProductModule[W, Double]) =
     {
       val decoder = new LossAugmentedMaxMarginDecoder(oracleInferencer, argmaxer)
       val updater = new L1Updater[W](C)
@@ -29,7 +29,7 @@ object Trainer {
   def newL1MIRATrainer[T, Y, W](oracleInferencer : OracleInferencer[T, Y, W], argmaxer : LossAugmentedArgmaxInferencer[T, Y, W],
                              iterationCallback : IterationCallback[T, W], C : Double = 1.0,
                              maxNumIters : Int = 100, opts : LogoOpts = new LogoOpts(), average : Boolean = true,
-                             addInitialConstraint : Option[FeatureVector[W]] = None) =
+                             addInitialConstraint : Option[W] = None)(implicit space: MutableInnerProductModule[W, Double]) =
     {
       val decoder = new LossAugmentedMaxMarginDecoder(oracleInferencer, argmaxer)
       val updater = new L1Updater[W](C)
@@ -40,7 +40,7 @@ object Trainer {
 
   def newPerceptronTrainer[T, Y, W](oracleInferencer : OracleInferencer[T, Y, W], argmaxer : ArgmaxInferencer[T, Y, W],
                                  iterationCallback : IterationCallback[T, W], learningRate : Double = 1.0,
-                                 maxNumIters : Int = 100, opts : LogoOpts = new LogoOpts(), average : Boolean = true) =
+                                 maxNumIters : Int = 100, opts : LogoOpts = new LogoOpts(), average : Boolean = true)(implicit space: MutableInnerProductModule[W, Double]) =
     {
       val decoder = new MaxMarginDecoder(oracleInferencer, argmaxer)
       val updater = new FixedStepSizeUpdater[W](_ => learningRate, Double.PositiveInfinity)
@@ -51,7 +51,7 @@ object Trainer {
   def newL2MaxMarginTrainer[T, Y, W](oracleInferencer : OracleInferencer[T, Y, W], argmaxer : LossAugmentedArgmaxInferencer[T, Y, W],
                                   iterationCallback : IterationCallback[T, W], C : Double = 1.0,
                                   maxNumIters : Int = 100, opts : LogoOpts = new LogoOpts(),
-                                  addInitialConstraint :  Option[FeatureVector[W]] = None)(implicit space: MutableInnerProductModule[W, Double]) =
+                                  addInitialConstraint :  Option[W] = None)(implicit space: MutableInnerProductModule[W, Double]) =
     {
       val decoder = new LossAugmentedMaxMarginDecoder(oracleInferencer, argmaxer)
       val updater = new L2Updater[W](C)
@@ -64,7 +64,7 @@ object Trainer {
   def newL1LogLossTrainer[T, Y, W](oracleInferencer : OracleInferencer[T, Y, W], summer : ExpectationInferencer[T, W],
                                 iterationCallback : IterationCallback[T, W], C : Double = 1.0,
                                 maxNumIters : Int = 100, opts : LogoOpts = new LogoOpts(),
-                                addInitialConstraint : Option[FeatureVector[W]] = None)(implicit space: MutableInnerProductModule[W, Double]) =
+                                addInitialConstraint : Option[W] = None)(implicit space: MutableInnerProductModule[W, Double]) =
     {
       val decoder = new LogLikelihoodDecoder(oracleInferencer, summer)
       val updater = new L1Updater[W](C)
@@ -77,7 +77,7 @@ object Trainer {
   def newL1LogLossMIRATrainer[T, Y, W](oracleInferencer : OracleInferencer[T, Y, W], summer : ExpectationInferencer[T, W],
                                     iterationCallback : IterationCallback[T, W], C : Double = 1.0,
                                     maxNumIters : Int = 100, opts : LogoOpts = new LogoOpts(), average : Boolean = true,
-                                    addInitialConstraint: Option[FeatureVector[W]] = None) =
+                                    addInitialConstraint: Option[W] = None)(implicit space: MutableInnerProductModule[W, Double]) =
     {
       val decoder = new LogLikelihoodDecoder(oracleInferencer, summer)
       val updater = new L1Updater[W](C)
@@ -88,7 +88,7 @@ object Trainer {
 
   def newStochasticGradientDescentTrainer[T, Y, W](oracleInferencer : OracleInferencer[T, Y, W], summer : ExpectationInferencer[T, W],
                                                 iterationCallback : IterationCallback[T, W], C : Double = 1.0, learningRate : Double = 1.0,
-                                                maxNumIters : Int = 100, opts : LogoOpts = new LogoOpts(), average : Boolean = true) =
+                                                maxNumIters : Int = 100, opts : LogoOpts = new LogoOpts(), average : Boolean = true)(implicit space: MutableInnerProductModule[W, Double]) =
     {
       val decoder = new LogLikelihoodDecoder(oracleInferencer, summer)
       val updater = new FixedStepSizeUpdater[W](iter => learningRate / Math.sqrt(iter + 1), C)
@@ -99,7 +99,7 @@ object Trainer {
   def newL1MarginRankTrainer[T, Y, W](argmaxer : LossAugmentedArgmaxInferencer[T, Y, W],
                                    iterationCallback : IterationCallback[T, W], C : Double = 1.0,
                                    gamma : Double = 0.0, maxNumIters : Int = 100, opts : LogoOpts = new LogoOpts(),
-                                   addInitialConstraint :  Option[FeatureVector[W]] = None)(implicit space: MutableInnerProductModule[W, Double]) =
+                                   addInitialConstraint :  Option[W] = None)(implicit space: MutableInnerProductModule[W, Double]) =
     {
       val decoder = new MaxMarginRankingDecoder(argmaxer, gamma)
       val updater = new L1Updater[W](C)
@@ -113,7 +113,7 @@ object Trainer {
     labels: IndexedSeq[L],
     data: Seq[LabeledDatum[L, F]],
     labelConjoiner: (L, F) => W,
-    initialConstraint: FeatureVector[W],
+    initialConstraint: W,
     iterationCallback: IterationCallback[LabeledDatum[L, F], W] = new NullIterationCallback[LabeledDatum[L, F], W](),
     oneSlackFormulation: Boolean = true,
     C: Double = 1.0,
@@ -139,11 +139,11 @@ object Trainer {
         new MulticlassOneSlackLossAugmentedArgmaxInferencer(argmaxer, initialConstraint),
         oneSlackIterCallBack, C, maxNumIters, opts)
       trainer.train(Seq(new Instance(data)),
-        new Weights(space.zeroLike(initialConstraint.data)))
+        new Weights(space.zeroLike(initialConstraint)))
     } else {
       val trainer = newL1MaxMarginTrainer(oracler, argmaxer, iterationCallback, C, maxNumIters, opts)
       trainer.train(data.map(new Instance[LabeledDatum[L, F], W](_)),
-        new Weights(space.zeroLike(initialConstraint.data)))
+        new Weights(space.zeroLike(initialConstraint)))
     }
     new MulticlassClassifier[L, F, W](weights, argmaxer)
   }
@@ -152,9 +152,10 @@ object Trainer {
 class Trainer[T, W](val convergenceChecker : ConvergenceChecker[W],
                  val iterationCallback : IterationCallback[T, W], val decoder : Decoder[T, W], val updater : Updater[W],
                  val opts : LogoOpts = new LogoOpts(),
-                 initialConstraintAndAlpha : Option[((FeatureVector[W], Double), Double)] = None,
+                 initialConstraintAndAlpha : Option[((W, Double), Double)] = None,
                  val online : Boolean = false,
-                 val average : Boolean = false) extends SerializableLogging {
+                 val average : Boolean = false)(implicit space: MutableInnerProductModule[W, Double]) extends SerializableLogging {
+  import space._
 
   final val eps = opts.constraintEpsilon
   final val numInnerOptimizationLoops = if (online) 1 else opts.numInnerOptimizationLoops
@@ -200,7 +201,7 @@ class Trainer[T, W](val convergenceChecker : ConvergenceChecker[W],
               instance.constraints.append((df_, l_))
               instance.alphas.append(alpha)
             }
-            val newSlack = l - df * w
+            val newSlack = l - w * df
             val currSlack = updater.currentSlack(instance, w)
             if (newSlack < currSlack - eps) {
               logger.warn(
