@@ -252,11 +252,13 @@ case class Trainer[T, W](convergenceChecker: ConvergenceChecker[W],
         }
       }
       loopWhile(numOuterOptimizationLoops) {
-        data.count { instance =>
-          loopWhile(numInnerOptimizationLoops) {
+        data.exists { instance =>
+          val numUpdatesExecuted = loopWhile(numInnerOptimizationLoops) {
             updater.update(instance, w, n, iteration)
-          } > 1
-        } > 0
+          }
+          // > 1 instead of > 0 because update is always called once, but it might do nothing.
+          numUpdatesExecuted > 1
+        }
       }
       iterationCallback.endIteration(iteration, w)
       if (average) {

@@ -8,16 +8,10 @@ class ObjectiveFunctionConvergenceChecker[W](val objective : ObjectiveFunction[W
     iter >= maxNumIters || (objectiveConverged(weights, data, iter) && numNewConstraints == 0)
   }
 
-  private def close(a : Double, b : Double) = {
-    val precision = 1e-10
-    val valueAverage = (Math.abs(a) + Math.abs(a)) / 2.0;
-    Math.abs(a - b) < precision || Math.abs(a - b) / valueAverage < tol
-  }
-
   private def objectiveConverged(weights : Weights[W], data : Seq[Instance[_, W]], iter : Int) = {
     val (primal, dual) = objective.calculatePrimalAndDual(weights, data)
     callback.objectiveValCheck(primal, dual, iter, weights)
-    close(primal, dual)
+    NumUtils.approxEquals(primal, dual, 1e-10)
   }
 
 }
