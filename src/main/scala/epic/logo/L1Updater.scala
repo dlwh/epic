@@ -6,7 +6,7 @@ import scala.util.Random
 import breeze.math.MutableInnerProductModule
 
 class L1Updater[W](C : Double)(implicit space: MutableInnerProductModule[W, Double]) extends Updater[W] {
-  val shuffleRand = new Random()
+  val shuffleRand = new Random(1)
   import space._
 
   def update(instance: Instance[_, W], w : Weights[W], n : Int, iter : Int) : Boolean = {
