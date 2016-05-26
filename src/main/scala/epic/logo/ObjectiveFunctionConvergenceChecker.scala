@@ -13,7 +13,7 @@ case class ObjectiveFunctionConvergenceChecker[W](
   private def objectiveConverged(weights: Weights[W], data: Seq[Instance[_, W]], iter: Int) = {
     val (primal, dual) = objective.calculatePrimalAndDual(weights, data)
     callback.objectiveValCheck(primal, dual, iter, weights)
-    NumUtils.approxEquals(primal, dual, 1e-10)
+    NumUtils.approxEquals(primal, dual, tol)
   }
 
 }
