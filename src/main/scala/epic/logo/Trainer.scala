@@ -253,13 +253,14 @@ case class Trainer[T, W](convergenceChecker: ConvergenceChecker[W],
       loopWhile(numOuterOptimizationLoops) {
         // Note: we don't use exists because we want to run on every example, not stop on the first
         // one with a change
-        !data.forall { instance =>
+        val instancesChanged = data.count { instance =>
           val numUpdatesExecuted = loopWhile(numInnerOptimizationLoops) {
             updater.update(instance, w, n, iteration)
           }
           // 1 instead of 0 because update is always called once, but it might do nothing.
           numUpdatesExecuted <= 1
         }
+        instancesChanged > 0
       }
       iterationCallback.endIteration(iteration, w)
       if (average) {
