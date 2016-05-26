@@ -5,9 +5,12 @@ import scala.runtime.DoubleRef
 
 trait Updater[W] {
 
-  def update(constraints: IndexedSeq[(W, Double)], alphas: Buffer[Double], slack: DoubleRef,
+  /**
+   * Mutates `instance` and `weights`.
+   */
+  def update(instance: Instance[_, W],
              weights: Weights[W], n: Int, iter: Int): Boolean
 
-  def currentSlack(i : Instance[_, W], w : Weights[W]) : Double
+  def currentSlack(i: Instance[_, W], w: Weights[W]): Double
 
 }

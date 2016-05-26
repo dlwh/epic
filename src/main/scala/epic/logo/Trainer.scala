@@ -244,9 +244,9 @@ case class Trainer[T, W](convergenceChecker: ConvergenceChecker[W],
               if (online) {
                 val constraints = ArrayBuffer((df, l)) ++ initialConstraintAndAlpha.map(_._1).toList
                 val alphas = ArrayBuffer(0.0) ++ initialConstraintAndAlpha.map(_._2).toList
-                updater.update(constraints, alphas, new DoubleRef(0.0), w, n, iteration)
+                updater.update(Instance(constraints, alphas), w, n, iteration)
               } else
-                updater.update(instance.constraints, instance.alphas, instance.slack, w, n, iteration)
+                updater.update(instance, w, n, iteration)
           }
           numChanges > 0
         }
@@ -254,7 +254,7 @@ case class Trainer[T, W](convergenceChecker: ConvergenceChecker[W],
       loopWhile(numOuterOptimizationLoops) {
         data.count { instance =>
           loopWhile(numInnerOptimizationLoops) {
-            updater.update(instance.constraints, instance.alphas, instance.slack, w, n, iteration)
+            updater.update(instance, w, n, iteration)
           } > 1
         } > 0
       }

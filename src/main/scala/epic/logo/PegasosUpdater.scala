@@ -6,7 +6,8 @@ import breeze.math.MutableInnerProductModule
 
 class PegasosUpdater[W](C : Double)(implicit space: MutableInnerProductModule[W, Double]) extends Updater[W] {
   import space._
-  def update(constraints : IndexedSeq[(W, Double)], alphas : Buffer[Double], slack : DoubleRef, w : Weights[W], n : Int, iter : Int) : Boolean = {
+  def update(instance: Instance[_, W], w : Weights[W], n : Int, iter : Int) : Boolean = {
+    import instance._
     assert(constraints.length == 2)
     val (df, _) = constraints(0)
     if (norm(df) == 0.0) return false

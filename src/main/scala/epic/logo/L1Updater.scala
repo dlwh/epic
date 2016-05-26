@@ -9,14 +9,16 @@ class L1Updater[W](C : Double)(implicit space: MutableInnerProductModule[W, Doub
   val shuffleRand = new Random()
   import space._
 
-  def update(constraints : IndexedSeq[(W, Double)], alphas : Buffer[Double], slack : DoubleRef, w : Weights[W], n : Int, iter : Int) : Boolean = {
+  def update(instance: Instance[_, W], w : Weights[W], n : Int, iter : Int) : Boolean = {
+    import instance._
     if (constraints.length == 1) {
-      if (alphas(0) != C) {
-        val eta = C - alphas(0)
+      val alpha0 = alphas(0)
+      if (alpha0 != C) {
+        val eta = C - alpha0
         val (df, l) = constraints(0)
         if (eta != 0.0) {
-          alphas(0) += eta
           w += df * eta
+          alphas(0) += eta
           return true
         }
       }
