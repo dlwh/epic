@@ -14,7 +14,7 @@ class PegasosUpdater[W](C : Double) extends Updater[W] {
 
     w *= (1.0 - eta * lambda)
     w += df * (eta * 1.0 / n)
-    val projScale = Math.min(1, 1.0 / Math.sqrt(lambda) / Math.sqrt(w ^ 2))
+    val projScale = Math.min(1, 1.0 / Math.sqrt(lambda) / Math.sqrt(w.`^2`))
     w *= projScale
 
     return true

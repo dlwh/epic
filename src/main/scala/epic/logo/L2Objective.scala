@@ -8,10 +8,12 @@ class L2Objective[W](val C : Double)(implicit space: MutableInnerProductModule[W
 
     val primal = {
       val slackSum = data.map(instance => instance.slack.elem * instance.slack.elem).sum
-      0.5 * (w ^ 2) + C * slackSum
+      0.5 * (w.`^2`) + C * slackSum
     }
     val dual = {
-      val lossSum = data.flatMap(instance => instance.alphas zip instance.constraints).map { case (alpha, (df, l)) => alpha * l }.sum
+      val lossSum = data.flatMap(instance => instance.alphas zip instance.constraints).map {
+        case (alpha, (df, l)) => alpha * l
+      }.sum
       C * lossSum - primal
     }
     (primal, dual)

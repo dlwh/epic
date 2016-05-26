@@ -12,7 +12,7 @@ class Weights[W](var array: W, var scale : Double = 1.0)(implicit space: Mutable
 
   def checkNorm = {
     val calcNorm = calcNormSquared
-    assert( NumUtils.approxEquals(this ^ 2, calcNorm, 1e-5))
+    assert(NumUtils.approxEquals(this.`^2`, calcNorm, 1e-5))
   }
 
   def approxEquals(w : Weights[W]) = {
@@ -53,10 +53,8 @@ class Weights[W](var array: W, var scale : Double = 1.0)(implicit space: Mutable
 
   }
 
-  def ^(x : Int) = {
-    assert(x == 2)
-    norm
-  }
+  def `^2` = norm
+
 
   def zeroOut() = {
     array = space.zeroLike.apply(array)

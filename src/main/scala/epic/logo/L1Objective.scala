@@ -25,11 +25,11 @@ class L1Objective[W](val C : Double)(implicit space: MutableInnerProductModule[W
     assert(w.approxEquals(calc_w))
     val primal = {
       val slackSum = data.map(i => L1Objective.slack(i, w)).sum
-      0.5 * (w ^ 2) + C * slackSum
+      0.5 * (w.`^2`) + C * slackSum
     }
     val dual = {
       val lossSum = data.flatMap(instance => instance.alphas zip instance.constraints).map { case (alpha, (df, l)) => alpha * l }.sum
-      -0.5 * (w ^ 2) + lossSum
+      -0.5 * (w.`^2`) + lossSum
     }
     (primal, dual)
   }
