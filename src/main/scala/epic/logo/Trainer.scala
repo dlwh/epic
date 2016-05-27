@@ -12,9 +12,9 @@ import breeze.math.MutableInnerProductModule
 import scala.reflect.ClassTag
 
 object Trainer {
-  def newL1MaxMarginTrainer[T, Y, W](
-    oracleInferencer: OracleInferencer[T, Y, W], argmaxer: LossAugmentedArgmaxInferencer[T, Y, W],
-    iterationCallback: IterationCallback[T, W] = NullIterationCallback[T, W](),
+  def newL1MaxMarginTrainer[T, W, OracleS, MaxerS](
+    oracleInferencer: OracleInferencer[T, W, OracleS], argmaxer: LossAugmentedArgmaxInferencer[T, W, MaxerS],
+    iterationCallback: IterationCallback[T, W, OracleS, MaxerS] = NullIterationCallback(),
     C: Double = 1.0,
     maxNumIters: Int = 100, opts: LogoOpts = new LogoOpts(),
     addInitialConstraint: Option[W] = None)(implicit space: MutableInnerProductModule[W, Double]) =
@@ -27,9 +27,9 @@ object Trainer {
         initialConstraintAndAlpha = addInitialConstraint.map(c => ((c, 0.0), C)))
     }
 
-  def newL1MIRATrainer[T, Y, W](
-    oracleInferencer: OracleInferencer[T, Y, W], argmaxer: LossAugmentedArgmaxInferencer[T, Y, W],
-    iterationCallback: IterationCallback[T, W], C: Double = 1.0,
+  def newL1MIRATrainer[T, Y, W, OracleS, MaxerS](
+    oracleInferencer: OracleInferencer[T, W, OracleS], argmaxer: LossAugmentedArgmaxInferencer[T, W, MaxerS],
+    iterationCallback: IterationCallback[T, W, OracleS, MaxerS], C: Double = 1.0,
     maxNumIters: Int = 100, opts: LogoOpts = new LogoOpts(), average: Boolean = true,
     addInitialConstraint: Option[W] = None)(implicit space: MutableInnerProductModule[W, Double]) =
     {
@@ -40,34 +40,38 @@ object Trainer {
         initialConstraintAndAlpha = addInitialConstraint.map(c => ((c, 0.0), C)))
     }
 
-  def newPerceptronTrainer[T, Y, W](
-    oracleInferencer: OracleInferencer[T, Y, W], argmaxer: ArgmaxInferencer[T, Y, W],
-    iterationCallback: IterationCallback[T, W], learningRate: Double = 1.0,
-    maxNumIters: Int = 100, opts: LogoOpts = new LogoOpts(), average: Boolean = true)(implicit space: MutableInnerProductModule[W, Double]) =
+  def newPerceptronTrainer[T, Y, W, OracleS, MaxerS](
+    oracleInferencer: OracleInferencer[T, W, OracleS], argmaxer: ArgmaxInferencer[T, W, MaxerS],
+    iterationCallback: IterationCallback[T, W, OracleS, MaxerS], learningRate: Double = 1.0,
+    maxNumIters: Int = 100,
+    opts: LogoOpts = new LogoOpts(),
+    average: Boolean = true)(implicit space: MutableInnerProductModule[W, Double]) =
     {
       val decoder = new MaxMarginDecoder(oracleInferencer, argmaxer)
       val updater = new FixedStepSizeUpdater[W](_ => learningRate, Double.PositiveInfinity)
       val convergenceChecker = new FixedIterationConvergenceChecker[W](maxNumIters)
-      new Trainer(convergenceChecker, iterationCallback, decoder, updater, opts, online = true, average = average)
+      new Trainer(convergenceChecker, iterationCallback, decoder, updater, opts, online = true,
+          average = average)
     }
 
-  def newL2MaxMarginTrainer[T, Y, W](
-    oracleInferencer: OracleInferencer[T, Y, W], argmaxer: LossAugmentedArgmaxInferencer[T, Y, W],
-    iterationCallback: IterationCallback[T, W], C: Double = 1.0,
+  def newL2MaxMarginTrainer[T, Y, W, OracleS, MaxerS](
+    oracleInferencer: OracleInferencer[T, W, OracleS], argmaxer: LossAugmentedArgmaxInferencer[T, W, MaxerS],
+    iterationCallback: IterationCallback[T, W, OracleS, MaxerS], C: Double = 1.0,
     maxNumIters: Int = 100, opts: LogoOpts = new LogoOpts(),
     addInitialConstraint: Option[W] = None)(implicit space: MutableInnerProductModule[W, Double]) =
     {
       val decoder = new LossAugmentedMaxMarginDecoder(oracleInferencer, argmaxer)
       val updater = new L2Updater[W](C)
       val objective = new L2Objective[W](C)
-      val convergenceChecker = new ObjectiveFunctionConvergenceChecker(objective, maxNumIters, iterationCallback,opts.convergenceTolerance)
+      val convergenceChecker = new ObjectiveFunctionConvergenceChecker(objective, maxNumIters,
+        iterationCallback, opts.convergenceTolerance)
       new Trainer(convergenceChecker, iterationCallback, decoder, updater, opts, online = false,
         initialConstraintAndAlpha = addInitialConstraint.map(c => ((c, 0.0), C)))
     }
 
-  def newL1LogLossTrainer[T, Y, W](
-    oracleInferencer: OracleInferencer[T, Y, W], summer: ExpectationInferencer[T, W],
-    iterationCallback: IterationCallback[T, W], C: Double = 1.0,
+  def newL1LogLossTrainer[T, Y, W, OracleS, MaxerS](
+    oracleInferencer: OracleInferencer[T, W, OracleS], summer: ExpectationInferencer[T, W, MaxerS],
+    iterationCallback: IterationCallback[T, W, OracleS, MaxerS], C: Double = 1.0,
     maxNumIters: Int = 100, opts: LogoOpts = new LogoOpts(),
     addInitialConstraint: Option[W] = None)(implicit space: MutableInnerProductModule[W, Double]) =
     {
@@ -80,9 +84,9 @@ object Trainer {
         initialConstraintAndAlpha = addInitialConstraint.map(c => ((c, 0.0), C)))
     }
 
-  def newL1LogLossMIRATrainer[T, Y, W](
-    oracleInferencer: OracleInferencer[T, Y, W], summer: ExpectationInferencer[T, W],
-    iterationCallback: IterationCallback[T, W], C: Double = 1.0,
+  def newL1LogLossMIRATrainer[T, W, OracleS, MaxerS](
+    oracleInferencer: OracleInferencer[T, W, OracleS], summer: ExpectationInferencer[T, W, MaxerS],
+    iterationCallback: IterationCallback[T, W, OracleS, MaxerS], C: Double = 1.0,
     maxNumIters: Int = 100, opts: LogoOpts = new LogoOpts(), average: Boolean = true,
     addInitialConstraint: Option[W] = None)(implicit space: MutableInnerProductModule[W, Double]) =
     {
@@ -93,10 +97,10 @@ object Trainer {
           average = average, initialConstraintAndAlpha = addInitialConstraint.map(c => ((c, 0.0), C)))
     }
 
-  def newStochasticGradientDescentTrainer[T, Y, W](
-    oracleInferencer: OracleInferencer[T, Y, W],
-    summer: ExpectationInferencer[T, W],
-    iterationCallback: IterationCallback[T, W], C: Double = 1.0,
+  def newStochasticGradientDescentTrainer[T, W, OracleS, MaxerS](
+    oracleInferencer: OracleInferencer[T, W, OracleS],
+    summer: ExpectationInferencer[T, W, MaxerS],
+    iterationCallback: IterationCallback[T, W, OracleS, MaxerS], C: Double = 1.0,
     learningRate: Double = 1.0,
     maxNumIters: Int = 100, opts: LogoOpts = new LogoOpts(),
     average: Boolean = true)(implicit space: MutableInnerProductModule[W, Double]) =
@@ -108,11 +112,12 @@ object Trainer {
           average = average)
     }
 
-  def newL1MarginRankTrainer[T, Y, W](argmaxer: LossAugmentedArgmaxInferencer[T, Y, W],
-                                      iterationCallback: IterationCallback[T, W], C: Double = 1.0,
-                                      gamma: Double = 0.0, maxNumIters: Int = 100,
-                                      opts: LogoOpts = new LogoOpts(),
-                                      addInitialConstraint: Option[W] = None)(implicit space: MutableInnerProductModule[W, Double]) =
+  def newL1MarginRankTrainer[T, W, MaxerS](
+    argmaxer: LossAugmentedArgmaxInferencer[T, W, MaxerS],
+    iterationCallback: IterationCallback[T, W, MaxerS, MaxerS], C: Double = 1.0,
+    gamma: Double = 0.0, maxNumIters: Int = 100,
+    opts: LogoOpts = new LogoOpts(),
+    addInitialConstraint: Option[W] = None)(implicit space: MutableInnerProductModule[W, Double]) =
     {
       val decoder = new MaxMarginRankingDecoder(argmaxer, gamma)
       val updater = new L1Updater[W](C)
@@ -128,8 +133,8 @@ object Trainer {
     data: Seq[LabeledDatum[L, F]],
     labelConjoiner: (L, F) => W,
     initialConstraint: W,
-    iterationCallback: IterationCallback[LabeledDatum[L, F], W] =
-      new NullIterationCallback[LabeledDatum[L, F], W](),
+    iterationCallback: IterationCallback[LabeledDatum[L, F], W, Unit, Unit] =
+      new NullIterationCallback[LabeledDatum[L, F], W, Unit, Unit](),
     oneSlackFormulation: Boolean = true,
     C: Double = 1.0,
     maxNumIters: Int = 100, opts: LogoOpts = new LogoOpts())(implicit space: MutableInnerProductModule[W, Double]) = {
@@ -137,12 +142,12 @@ object Trainer {
     val argmaxer = new MulticlassLossAugmentedArgmaxInferencer[L, F, W](labels, labelConjoiner)
     val oracler = new MulticlassOracleInferencer[L, F, W](labels, labelConjoiner)
     val weights = if (oneSlackFormulation) {
-      val oneSlackIterCallBack = new IterationCallback[Seq[LabeledDatum[L, F]], W]() {
+      val oneSlackIterCallBack = new IterationCallback[Seq[LabeledDatum[L, F]], W, Unit, Unit]() {
         override def startIteration(iter: Int, weights: Weights[W]): Unit =
           iterationCallback.startIteration(iter, weights)
 
-        override def endIteration(iter: Int, weights: Weights[W]): Unit =
-          iterationCallback.endIteration(iter, weights)
+        override def endIteration(iter: Int, weights: Weights[W], unused: Unit, unused2: Unit): Unit =
+          iterationCallback.endIteration(iter, weights, unused, unused2)
 
         override def objectiveValCheck(primal: Double, dual: Double, iter: Int, weights: Weights[W]): Unit =
           iterationCallback.objectiveValCheck(primal, dual, iter, weights)
@@ -166,13 +171,15 @@ object Trainer {
   }
 }
 
-case class Trainer[T, W](convergenceChecker: ConvergenceChecker[W],
-                         iterationCallback: IterationCallback[T, W], val decoder: Decoder[T, W],
-                         updater: Updater[W],
-                         opts: LogoOpts = new LogoOpts(),
-                         initialConstraintAndAlpha: Option[((W, Double), Double)] = None,
-                         online: Boolean = false,
-                         average: Boolean = false)(implicit space: MutableInnerProductModule[W, Double])
+case class Trainer[T, W, OracleS, MaxerS](
+  convergenceChecker: ConvergenceChecker[W],
+  iterationCallback: IterationCallback[T, W, OracleS, MaxerS],
+  decoder: Decoder[T, W, OracleS, MaxerS],
+  updater: Updater[W],
+  opts: LogoOpts = new LogoOpts(),
+  initialConstraintAndAlpha: Option[((W, Double), Double)] = None,
+  online: Boolean = false,
+  average: Boolean = false)(implicit space: MutableInnerProductModule[W, Double])
     extends SerializableLogging {
   import space._
 
@@ -205,6 +212,7 @@ case class Trainer[T, W](convergenceChecker: ConvergenceChecker[W],
       iterationCallback.startIteration(iteration, w)
 
       var currStart = 0;
+      var (oracleInferencerState, maxerInferenceState) = decoder.initialState
       while (iter.hasNext) {
         val currMiniBatchUnshuffled = consume(iter, Math.min(data.length, opts.miniBatchSize))
         val currMiniBatch =
@@ -214,7 +222,7 @@ case class Trainer[T, W](convergenceChecker: ConvergenceChecker[W],
           currMiniBatchUnshuffled
         iterationCallback.startMinibatch(iteration, w, currMiniBatch)
         val decodedMiniBatch = for (MinibatchInput(instance, instanceNum) <- currMiniBatch) yield {
-          val (df, l) = decoder.decode(w, instance.x)
+          val (df, l, newOracleInferencerState, newMaxerInferenceState) = decoder.decode(w, instance.x)
           if (!online) {
             if (iteration == 0 && initialConstraintAndAlpha.isDefined) {
               val ((df_, l_), alpha) = initialConstraintAndAlpha.get
@@ -234,12 +242,19 @@ case class Trainer[T, W](convergenceChecker: ConvergenceChecker[W],
               numAdded += 1
             }
           }
-          MinibatchOutput(instance, instanceNum, df, l)
+          MinibatchOutput(instance, instanceNum, df, l, newOracleInferencerState, newMaxerInferenceState)
         }
+        val (newOracleInferencerState, newMaxerInferenceState) =
+          decodedMiniBatch.foldLeft((oracleInferencerState, maxerInferenceState)) {
+          case (statePair, MinibatchOutput(_, _, _, _, oracleState, maxerState)) =>
+            decoder.reduceStates(statePair, (oracleState, maxerState))
+        }
+        oracleInferencerState = newOracleInferencerState
+        maxerInferenceState = newMaxerInferenceState
         iterationCallback.endMinibatch(iteration, w, decodedMiniBatch)
         loopWhile(numInnerOptimizationLoops) {
           val numChanges = decodedMiniBatch.count {
-            case MinibatchOutput(instance, instanceNum, df, l) =>
+            case MinibatchOutput(instance, instanceNum, df, l, _, _) =>
               if (online) {
                 val constraints = ArrayBuffer((df, l)) ++ initialConstraintAndAlpha.map(_._1).toList
                 val alphas = ArrayBuffer(0.0) ++ initialConstraintAndAlpha.map(_._2).toList
@@ -262,7 +277,7 @@ case class Trainer[T, W](convergenceChecker: ConvergenceChecker[W],
         }
         instancesChanged > 0
       }
-      iterationCallback.endIteration(iteration, w)
+      iterationCallback.endIteration(iteration, w, oracleInferencerState, maxerInferenceState)
       if (average) {
         average_w *= iteration / (iteration + 1)
         average_w.increment(w, 1.0 / (iteration + 1))

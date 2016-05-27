@@ -4,7 +4,7 @@ import scala.collection.Seq
 
 case class ObjectiveFunctionConvergenceChecker[W](
     objective: ObjectiveFunction[W], maxNumIters: Int,
-    callback: IterationCallback[_, W], tol: Double) extends ConvergenceChecker[W] {
+    callback: IterationCallback[_, W, _, _], tol: Double) extends ConvergenceChecker[W] {
 
   def converged(weights: Weights[W], data: Seq[Instance[_, W]], iter: Int, numNewConstraints: Int): Boolean = {
     iter >= maxNumIters || (objectiveConverged(weights, data, iter) && numNewConstraints == 0)
