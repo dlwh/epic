@@ -152,9 +152,9 @@ object Trainer {
         override def objectiveValCheck(primal: Double, dual: Double, iter: Int, weights: Weights[W]): Unit =
           iterationCallback.objectiveValCheck(primal, dual, iter, weights)
 
-        override def converged(weights: Weights[W], data: Seq[Instance[Seq[LabeledDatum[L, F]], W]],
+        override def converged(weights: Weights[W], data: Seq[DualVariableHolder[Seq[LabeledDatum[L, F]], W]],
                                iter: Int, numNewConstraints: Int): Boolean = {
-          iterationCallback.converged(weights, data.head.x.map(new Instance[LabeledDatum[L, F], W](_)),
+          iterationCallback.converged(weights, data.head.x.map(DualVariableHolder[LabeledDatum[L, F], W](_)),
             iter, numNewConstraints)
         }
 
@@ -188,7 +188,7 @@ case class Trainer[T, W, OracleS, MaxerS](
   final val numOuterOptimizationLoops = if (online) 0 else opts.numOuterOptimizationLoops
 
   def train(rawData : Seq[T], initWeights : Weights[W]) = {
-    val data = rawData.map(datum => Instance[T, W](datum))
+    val data = rawData.map(datum => DualVariableHolder[T, W](datum))
     val n = data.length
     val w = if (online) initWeights else {
       if (initWeights.norm != 0.0) {
@@ -259,7 +259,7 @@ case class Trainer[T, W, OracleS, MaxerS](
               if (online) {
                 val constraints = ArrayBuffer((df, l)) ++ initialConstraintAndAlpha.map(_._1).toList
                 val alphas = ArrayBuffer(0.0) ++ initialConstraintAndAlpha.map(_._2).toList
-                updater.update(Instance(constraints, alphas), w, n, iteration)
+                updater.update(DualVariableHolder(constraints, alphas), w, n, iteration)
               } else
                 updater.update(instance, w, n, iteration)
           }

@@ -7,7 +7,7 @@ import breeze.math.MutableInnerProductModule
 class FixedStepSizeUpdater[W](stepSize : Int => Double, C : Double)(implicit space: MutableInnerProductModule[W, Double]) extends Updater[W] {
   import space._
 
-  def update(instance: Instance[_, W],
+  def update(instance: DualVariableHolder[_, W],
              w: Weights[W], n: Int, iter: Int): Boolean = {
     import instance._
     assert(constraints.length == 2)
@@ -24,7 +24,7 @@ class FixedStepSizeUpdater[W](stepSize : Int => Double, C : Double)(implicit spa
     return true
   }
 
-  def currentSlack(i : Instance[_, W], w : Weights[W]) : Double = {
+  def currentSlack(i : DualVariableHolder[_, W], w : Weights[W]) : Double = {
     throw new UnsupportedOperationException(this.getClass().getName() + " should be only be used in online mode.")
   }
 

@@ -9,7 +9,7 @@ class L1Updater[W](C : Double)(implicit space: MutableInnerProductModule[W, Doub
   val shuffleRand = new Random(1)
   import space._
 
-  def update(instance: Instance[_, W], w : Weights[W], n : Int, iter : Int) : Boolean = {
+  def update(instance: DualVariableHolder[_, W], w : Weights[W], n : Int, iter : Int) : Boolean = {
     import instance._
     if (constraints.length == 1) {
       val alpha0 = alphas(0)
@@ -49,7 +49,7 @@ class L1Updater[W](C : Double)(implicit space: MutableInnerProductModule[W, Doub
     }
   }
 
-  def currentSlack(i : Instance[_, W], w : Weights[W]) = {
+  def currentSlack(i : DualVariableHolder[_, W], w : Weights[W]) = {
     L1Objective.slack(i, w)
   }
 }

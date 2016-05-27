@@ -10,7 +10,7 @@ trait IterationCallback[T, W, OracleS, MaxerS] {
 
   def objectiveValCheck(primal : Double, dual : Double, iter : Int, weights : Weights[W]) : Unit = {}
 
-  def converged(weights : Weights[W], data : Seq[Instance[T, W]], iter : Int, numNewConstraints : Int) : Boolean = false
+  def converged(weights : Weights[W], data : Seq[DualVariableHolder[T, W]], iter : Int, numNewConstraints : Int) : Boolean = false
 
 }
 

@@ -24,7 +24,7 @@ class CompoundIterationCallback[T, W, S1, S2](val callbacks: Iterable[IterationC
     callbacks.foreach(_.objectiveValCheck(primal, dual, iter, w))
   }
 
-  override def converged(weights: Weights[W], data: Seq[Instance[T, W]],
+  override def converged(weights: Weights[W], data: Seq[DualVariableHolder[T, W]],
                          iter: Int, numNewConstraints: Int): Boolean = {
     callbacks.forall(_.converged(weights, data, iter, numNewConstraints))
   }
