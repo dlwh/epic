@@ -7,7 +7,7 @@ import breeze.math.MutableInnerProductModule
 class L2Updater[W](C : Double)(implicit space: MutableInnerProductModule[W, Double]) extends Updater[W] {
   import space._
 
-  def update(instance: Instance[_, W],
+  def update(instance: DualVariableHolder[_, W],
              w: Weights[W], n: Int, iter: Int): Boolean = {
     import instance._
     for (((df, l), s) <- constraints.zipWithIndex) {
@@ -31,7 +31,7 @@ class L2Updater[W](C : Double)(implicit space: MutableInnerProductModule[W, Doub
 
   }
 
-  def currentSlack(i : Instance[_, W], w : Weights[W]) = {
+  def currentSlack(i : DualVariableHolder[_, W], w : Weights[W]) = {
     i.slack
   }
 

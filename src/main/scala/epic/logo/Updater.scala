@@ -8,9 +8,9 @@ trait Updater[W] {
   /**
    * Mutates `instance` and `weights`.
    */
-  def update(instance: Instance[_, W],
+  def update(instance: DualVariableHolder[_, W],
              weights: Weights[W], n: Int, iter: Int): Boolean
 
-  def currentSlack(i: Instance[_, W], w: Weights[W]): Double
+  def currentSlack(i: DualVariableHolder[_, W], w: Weights[W]): Double
 
 }

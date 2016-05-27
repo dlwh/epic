@@ -4,7 +4,7 @@ import breeze.linalg._
 import breeze.math.MutableInnerProductModule
 
 object L1Objective {
-  def slack[W](i : Instance[_, W], w : Weights[W])(implicit space: MutableInnerProductModule[W, Double]) = {
+  def slack[W](i : DualVariableHolder[_, W], w : Weights[W])(implicit space: MutableInnerProductModule[W, Double]) = {
     import space._
     if (i.constraints.isEmpty)
       Double.NegativeInfinity
@@ -17,7 +17,7 @@ object L1Objective {
 class L1Objective[W](val C : Double)(implicit space: MutableInnerProductModule[W, Double]) extends ObjectiveFunction[W] {
   import space._
 
-  def calculatePrimalAndDual(w : Weights[W], data : Seq[Instance[_, W]]): (Double, Double) = {
+  def calculatePrimalAndDual(w : Weights[W], data : Seq[DualVariableHolder[_, W]]): (Double, Double) = {
     w.checkNorm
     val calc_w = new Weights(space.zeroLike(w.underlying))
     data.flatMap(instance => instance.alphas zip instance.constraints).map { case (alpha, (df, l)) => df * alpha }.foreach(fv => {

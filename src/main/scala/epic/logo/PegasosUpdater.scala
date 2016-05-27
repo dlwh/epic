@@ -6,7 +6,7 @@ import breeze.math.MutableInnerProductModule
 
 class PegasosUpdater[W](C : Double)(implicit space: MutableInnerProductModule[W, Double]) extends Updater[W] {
   import space._
-  def update(instance: Instance[_, W], w : Weights[W], n : Int, iter : Int) : Boolean = {
+  def update(instance: DualVariableHolder[_, W], w : Weights[W], n : Int, iter : Int) : Boolean = {
     import instance._
     assert(constraints.length == 2)
     val (df, _) = constraints(0)
@@ -24,7 +24,7 @@ class PegasosUpdater[W](C : Double)(implicit space: MutableInnerProductModule[W,
 
   }
 
-  def currentSlack(i : Instance[_, W], w : Weights[W]) : Double = {
+  def currentSlack(i : DualVariableHolder[_, W], w : Weights[W]) : Double = {
     throw new UnsupportedOperationException(this.getClass().getName() + " should be only be used in online mode.")
   }
 

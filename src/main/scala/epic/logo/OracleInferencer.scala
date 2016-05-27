@@ -1,7 +1,7 @@
 package epic.logo
 
-trait OracleInferencer[T, Y, W] {
+trait OracleInferencer[T, W, S] extends Inferencer[S] {
+  type Y
 
-  def oracle(weights : Weights[W], instance : T) : (Y, W, Double)
-
+  def oracle(weights : Weights[W], instance : T) : (Y, W, Double, S)
 }
