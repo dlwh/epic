@@ -26,7 +26,8 @@ class L1Objective[W](val C : Double)(implicit space: MutableInnerProductModule[W
     assert(data.forall(instance => NumUtils.approxEquals(C, instance.alphas.sum, 1e-5)))
     assert(w.approxEquals(calc_w))
     val primal = {
-      val slackSum = data.map(i => L1Objective.slack(i, w)).sum
+      val slacks = data.map(i => L1Objective.slack(i, w))
+      val slackSum = slacks.sum
       0.5 * (w.`^2`) + C * slackSum
     }
     val dual = {

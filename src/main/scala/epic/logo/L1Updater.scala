@@ -45,6 +45,11 @@ class L1Updater[W](C : Double)(implicit space: MutableInnerProductModule[W, Doub
         }
 
       }
+      if (anyChange) {
+        val sum = alphas.sum
+        assert(NumUtils.approxEquals(sum, C, tol = 1e-9))
+        alphas(0) = C - (sum - alphas(0))
+      }
       return anyChange
     }
   }

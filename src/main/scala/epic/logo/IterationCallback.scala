@@ -4,7 +4,7 @@ trait IterationCallback[T, W, OracleS, MaxerS] {
 
   def startIteration(iter : Int, weights : Weights[W]) : Unit = {}
 
-  def startMinibatch(iter : Int, weights : Weights[W], miniBatch : Array[MinibatchInput[T, W]]) : Unit = {}
+  def startMinibatch(iter : Int, weights : Weights[W], miniBatch : Array[DualVariableHolder[T, W]]) : Unit = {}
   def endMinibatch(iter : Int, weights : Weights[W], miniBatch : Array[MinibatchOutput[T, W, OracleS, MaxerS]]) : Unit = {}
   def endIteration(iter : Int, weights : Weights[W], oracleState: OracleS, maxerState: MaxerS) : Unit = {}
 

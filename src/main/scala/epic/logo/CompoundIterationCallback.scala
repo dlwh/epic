@@ -8,7 +8,7 @@ class CompoundIterationCallback[T, W, S1, S2](val callbacks: Iterable[IterationC
   }
 
   override def startMinibatch(iter: Int, weights: Weights[W],
-                              miniBatch: Array[MinibatchInput[T, W]]): Unit = {
+                              miniBatch: Array[DualVariableHolder[T, W]]): Unit = {
     callbacks.foreach(_.startMinibatch(iter, weights, miniBatch))
   }
   override def endMinibatch(iter: Int, weights: Weights[W],

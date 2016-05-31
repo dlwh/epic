@@ -207,21 +207,14 @@ case class Trainer[T, W, OracleS, MaxerS](
     val shuffleRand = if (opts.shuffleSeed < 0) new Random() else new Random(opts.shuffleSeed)
     do {
       numAdded = 0
-      val coll = data.zipWithIndex.map { case (instance, instanceNum) => MinibatchInput(instance, instanceNum) }
-      var iter = coll.iterator
+      val coll = shuffleRand.shuffle(data)
       iterationCallback.startIteration(iteration, w)
 
       var currStart = 0;
       var (oracleInferencerState, maxerInferenceState) = decoder.initialState
-      while (iter.hasNext) {
-        val currMiniBatchUnshuffled = consume(iter, Math.min(data.length, opts.miniBatchSize))
-        val currMiniBatch =
-          if (opts.shuffleMinibatches)
-          shuffleRand.shuffle(currMiniBatchUnshuffled.toBuffer).toArray
-        else
-          currMiniBatchUnshuffled
-        iterationCallback.startMinibatch(iteration, w, currMiniBatch)
-        val decodedMiniBatch = for (MinibatchInput(instance, instanceNum) <- currMiniBatch) yield {
+      for (currMiniBatch <- coll.grouped(opts.miniBatchSize)) {
+        iterationCallback.startMinibatch(iteration, w, currMiniBatch.toArray)
+        val decodedMiniBatch = for (instance <- currMiniBatch) yield {
           val (df, l, newOracleInferencerState, newMaxerInferenceState) = decoder.decode(w, instance.x)
           if (!online) {
             if (iteration == 0 && initialConstraintAndAlpha.isDefined) {
@@ -242,20 +235,20 @@ case class Trainer[T, W, OracleS, MaxerS](
               numAdded += 1
             }
           }
-          MinibatchOutput(instance, instanceNum, df, l, newOracleInferencerState, newMaxerInferenceState)
+          MinibatchOutput(instance, df, l, newOracleInferencerState, newMaxerInferenceState)
         }
         val (newOracleInferencerState, newMaxerInferenceState) =
           decodedMiniBatch.foldLeft((oracleInferencerState, maxerInferenceState)) {
-          case (statePair, MinibatchOutput(_, _, _, _, oracleState, maxerState)) =>
+          case (statePair, MinibatchOutput(_, _, _, oracleState, maxerState)) =>
 
             decoder.reduceStates(statePair, (oracleState, maxerState))
         }
         oracleInferencerState = newOracleInferencerState
         maxerInferenceState = newMaxerInferenceState
-        iterationCallback.endMinibatch(iteration, w, decodedMiniBatch)
+        iterationCallback.endMinibatch(iteration, w, decodedMiniBatch.toArray)
         loopWhile(numInnerOptimizationLoops) {
           val numChanges = decodedMiniBatch.count {
-            case MinibatchOutput(instance, instanceNum, df, l, _, _) =>
+            case MinibatchOutput(instance, df, l, _, _) =>
               if (online) {
                 val constraints = ArrayBuffer((df, l)) ++ initialConstraintAndAlpha.map(_._1).toList
                 val alphas = ArrayBuffer(0.0) ++ initialConstraintAndAlpha.map(_._2).toList
@@ -266,18 +259,17 @@ case class Trainer[T, W, OracleS, MaxerS](
           numChanges > 0
         }
       }
-      loopWhile(numOuterOptimizationLoops) {
+      val numOuter = loopWhile(numOuterOptimizationLoops) {
         // Note: we don't use exists because we want to run on every example, not stop on the first
         // one with a change
-        val numChanges = data.count { instance =>
-          val numUpdatesExecuted = loopWhile(numInnerOptimizationLoops) {
-            updater.update(instance, w, n, iteration)
-          }
-          // 1 instead of 0 because update is always called once, but it might do nothing.
-          numUpdatesExecuted > 1
+        val numChanges = shuffleRand.shuffle(data).count { instance =>
+          updater.update(instance, w, n, iteration)
         }
-        numChanges > 0
+        val objConverged = convergenceChecker.converged(w, data, 0, 0)
+
+        numChanges > 0 && !objConverged
       }
+      println("numOuter:: " + numOuter)
       iterationCallback.endIteration(iteration, w, oracleInferencerState, maxerInferenceState)
       if (average) {
         average_w *= iteration / (iteration + 1)
@@ -305,14 +297,4 @@ case class Trainer[T, W, OracleS, MaxerS](
     }
     loop
   }
-
-  private def consume[A: ClassTag](iter : Iterator[A], num : Int) = {
-    val ret = new ArrayBuffer[A]()
-    ret.sizeHint(num)
-    for (i <- 0 until num if iter.hasNext) {
-      ret += iter.next
-    }
-    ret.toArray
-  }
-
 }

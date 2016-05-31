@@ -3,14 +3,14 @@ package epic.logo
 
 case class LogoOpts(constraintEpsilon: Double = 1e-3,
 
-	miniBatchSize: Int = 1,
+  miniBatchSize: Int = 1,
 
-	numInnerOptimizationLoops: Int = 10,
+  numInnerOptimizationLoops: Int = 10,
 
-	numOuterOptimizationLoops: Int = 10,
+  numOuterOptimizationLoops: Int = 10,
 
-	shuffleMinibatches: Boolean = false,
+  shuffleMinibatches: Boolean = false,
 
-	shuffleSeed: Int = -1,
+  shuffleSeed: Int = -1,
 
-	convergenceTolerance: Double = 1e-3)
+  convergenceTolerance: Double = 1e-3)
