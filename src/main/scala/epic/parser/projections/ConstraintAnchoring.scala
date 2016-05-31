@@ -61,7 +61,6 @@ class ParserChartConstraintsFactory[L, W](val parser: Parser[L, W],
   val prunedtags = new AtomicInteger(0)
   val notprunedtags = new AtomicInteger(0)
 
-
   private val synthetics = BitSet.empty ++ (0 until topology.labelIndex.size).filter(l => isIntermediate(labelIndex.get(l)))
 
   def constraints(w: IndexedSeq[W]):ChartConstraints[L] = constraints(w, GoldTagPolicy.noGoldTags[L])
@@ -74,7 +73,7 @@ class ParserChartConstraintsFactory[L, W](val parser: Parser[L, W],
     logger.debug(s"Building Constraints for ${marg.words}")
     assert(marg.isMaxMarginal)
     val length = marg.length
-    if(marg.logPartition.isInfinite)
+    if (marg.logPartition.isInfinite)
       throw new NoParseException("No parse for sentence we're trying to constrain!", marg.words)
     val (botLabelScores, unaryScores) = computeScores(length, marg)
 
@@ -92,19 +91,18 @@ class ParserChartConstraintsFactory[L, W](val parser: Parser[L, W],
       assert(labelThresholds(i, i+1) != null && labelThresholds(i,i+1).nonEmpty, "label thresholds" + labelThresholds(i, i+1))
       assert(topLabelThresholds(i, i+1) != null && topLabelThresholds(0,length).nonEmpty, "top label thresholds" + topLabelThresholds(i, i+1))
     }
-    if(topLabelThresholds(0,length) == null || !topLabelThresholds(0,length).contains(marg.topology.rootIndex))
+    if (topLabelThresholds(0,length) == null || !topLabelThresholds(0,length).contains(marg.topology.rootIndex))
       throw new NoParseException("No score at the root!", marg.words)
 
-//    val hasMaximalProjection: BitSet = BitSet.empty ++ (0 to length).filter{ i =>
-//      ((labelThresholds(i) ne null) && (topLabelThresholds(i) ne null)) && ((labelThresholds(i)|topLabelThresholds(i)) -- synthetics).nonEmpty
-//    }
+      // val hasMaximalProjection: BitSet = BitSet.empty ++ (0 to length).filter{ i =>
+      //  ((labelThresholds(i) ne null) && (topLabelThresholds(i) ne null)) && ((labelThresholds(i)|topLabelThresholds(i)) -- synthetics).nonEmpty
+      // }
 
-    //, hasMaximalProjection)
+      //, hasMaximalProjection)
     val con = ChartConstraints[L](topLabelThresholds, labelThresholds)
-//    PrecacheConstraints.checkConstraints(TreeInstance("viterbi", vit, marg.words), con, this)
+    // PrecacheConstraints.checkConstraints(TreeInstance("viterbi", vit, marg.words), con, this)
     con
   }
-
 
   private def extractLabelThresholds(length: Int, numLabels: Int,
                                      scores: Array[Array[Double]],
@@ -115,25 +113,25 @@ class ParserChartConstraintsFactory[L, W](val parser: Parser[L, W],
       val thresholdedTags = if (arr eq null) {
         BitSet.empty
       } else {
-        BitSet.empty ++ (0 until arr.length filter { s =>
+        BitSet.empty ++ (arr.indices filter { s =>
           arr(s) >= threshold
         })
       }
 
-      if(arr ne null)
-        if(j == i) {
-        } else if(j - i > 1) {
+      if (arr ne null)
+        if (j == i) {
+        } else if (j - i > 1) {
           this.notpruned.addAndGet(thresholdedTags.size)
           this.pruned.addAndGet(arr.count(_ != 0.0) - thresholdedTags.size)
         } else {
-          if(thresholdedTags.isEmpty) assert(false, arr.toIndexedSeq)
+          if (thresholdedTags.isEmpty) assert(false, arr.toIndexedSeq)
           this.notprunedtags.addAndGet(thresholdedTags.size)
           this.prunedtags.addAndGet(arr.count(_ != 0.0) - thresholdedTags.size)
         }
 
       val goldTags = (0 until numLabels).filter { isGold(i, j, _) }
       for(t <- goldTags if arr == null || arr(t) < threshold) {
-        if(arr == null) {
+        if (arr == null) {
           logger.warn(s"Can't even construct span that has gold tag ${labelIndex.get(t)}!")
         } else {
           logger.warn(s"Got a below threshold for a goldTag! ${arr(t)} $threshold ${labelIndex.get(t)} "
@@ -166,12 +164,11 @@ class ParserChartConstraintsFactory[L, W](val parser: Parser[L, W],
         for(c <- 0 until topology.labelIndex.size) {
           thresholds += arr(c)
           nConstructed += 1
-          if(gold.isGoldBotTag(i, j, c)) {
-            if(arr(c) != 0)
+          if (gold.isGoldBotTag(i, j, c)) {
+            if (arr(c) != 0)
               nGoldConstructed += 1
             else {
               throw new RuntimeException("Can't construct gold tree for " + " " + marg.words)
-              counts(c) += 1
             }
             gThresholds += arr(c)
           }
@@ -183,8 +180,8 @@ class ParserChartConstraintsFactory[L, W](val parser: Parser[L, W],
         for(c <- 0 until grammar.labelIndex.size) {
           thresholds += arr(c)
           nConstructed += 1
-          if(gold.isGoldTopTag(i, j, c)) {
-            if(arr(c) != 0)
+          if (gold.isGoldTopTag(i, j, c)) {
+            if (arr(c) != 0)
               nGoldConstructed += 1
             else counts(c) += 1
             gThresholds += arr(c)
@@ -203,7 +200,6 @@ class ParserChartConstraintsFactory[L, W](val parser: Parser[L, W],
     val visitor = new AnchoredVisitor[L] {
       def visitBinaryRule(begin: Int, split: Int, end: Int, rule: Int, ref: Int, score: Double) {}
 
-
       override def skipBinaryRules: Boolean = true
 
       def visitUnaryRule(begin: Int, end: Int, rule: Int, ref: Int, score: Double) {
@@ -215,7 +211,6 @@ class ParserChartConstraintsFactory[L, W](val parser: Parser[L, W],
           topScores(index)(topology.parent(rule)) = topScores(index)(topology.parent(rule)) max score
         }
       }
-
 
       def visitSpan(begin: Int, end: Int, tag: Int, ref: Int, score: Double) {
         val index = TriangularArray.index(begin, end)
@@ -240,7 +235,7 @@ object ParserChartConstraintsFactory {
 
   case class PruningStatistics(data: Array[Double], nConstructed: Double, pruningCounts: DenseVector[Double]) {
     def merge(other: PruningStatistics, nAllowed:Int = data.length): PruningStatistics = {
-      if(nAllowed >= data.length + other.data.length) {
+      if (nAllowed >= data.length + other.data.length) {
         PruningStatistics(data ++ other.data, this.nConstructed + other.nConstructed, pruningCounts + other.pruningCounts)
       } else {
         val subsetThisSize = new Binomial(nAllowed, nConstructed/(other.nConstructed + nConstructed)).draw()
@@ -256,9 +251,6 @@ object ParserChartConstraintsFactory {
   }
 
 }
-
-
-
 
 /**
   * Object for creating  [[epic.constraints.CachedChartConstraintsFactory]]
@@ -283,19 +275,18 @@ object PrecacheConstraints extends LazyLogging {
    **/
    def forTreebank(constrainer: ParserChartConstraintsFactory[AnnotatedLabel, String], treebank: ProcessedTreebank, tableName: String = "parseConstraints", verifyNoGoldPruningInTrain: Boolean = true)(implicit broker: CacheBroker) = {
     val cached = forTrainingSet(constrainer, treebank.trainTrees.par.map(ti => ti.copy(tree = ti.tree.map(_.baseAnnotatedLabel))), tableName, verifyNoGoldPruning = verifyNoGoldPruningInTrain)
-    (treebank.devTrees).par.foreach { ti =>
+    treebank.devTrees.par.foreach { ti =>
       logger.info(s"Ensuring existing constraint for dev tree ${ti.id} ${ti.words}")
       val constraints = cached.constraints(ti.words)
-      if(verifyNoGoldPruningInTrain)
+      if (verifyNoGoldPruningInTrain)
         checkConstraints(ti.copy(tree = ti.tree.map(_.baseAnnotatedLabel)), constraints, constrainer)
     }
-    (treebank.testTrees).par.foreach { ti =>
+    treebank.testTrees.par.foreach { ti =>
       logger.info(s"Ensuring existing constraint for test sentence ${ti.id} ${ti.words}")
        cached.constraints(ti.words)
     }
     cached
   }
-
 
   /**
    * Method for creating  [[epic.constraints.CachedChartConstraintsFactory]]
@@ -316,16 +307,16 @@ object PrecacheConstraints extends LazyLogging {
         logger.info(s"Building constraints for ${ti.id} ${ti.words}")
         constrainer.constraints(ti.words)
       })
-      if(located) {
+      if (located) {
         logger.info(s"Already had constraints for ${ti.id} ${ti.words}.")
-      } else if(verifyNoGoldPruning) {
+      } else if (verifyNoGoldPruning) {
         checkConstraints(ti, constraints, constrainer)
       }
       val count: Int = parsed.incrementAndGet()
-      if(count % 10 == 0) {
+      if (count % 10 == 0) {
         logger.info("Pruning statistics so far: " + constrainer.overallStatistics)
       }
-      if(count % 100 == 0) {
+      if (count % 100 == 0) {
         logger.info(s"Parsed $count/$len.")
       }
 
@@ -337,7 +328,6 @@ object PrecacheConstraints extends LazyLogging {
     broker.commit()
     new CachedChartConstraintsFactory(constrainer, cache)
   }
-
 
   def checkConstraints[W, L](ti: TreeInstance[L, W], constraints: ChartConstraints[L], constrainer: ParserChartConstraintsFactory[L, W]) {
     //        val decoded = new ViterbiDecoder[L, W].extractBestParse(marg)

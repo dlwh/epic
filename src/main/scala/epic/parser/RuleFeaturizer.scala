@@ -41,6 +41,5 @@ class RuleFeaturizer[L, W](grammar: RuleTopology[L]) extends RefinedFeaturizer[L
     }
   }
 
-
   override def lock = this
 }

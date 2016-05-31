@@ -15,7 +15,6 @@ class NormalIndexBuilder[F] extends IndexBuilder[F] {
   
   def add(fs: TraversableOnce[F]):Unit = {
     fs.foreach(_result.index)
-
   }
 
 }
@@ -23,5 +22,4 @@ class NormalIndexBuilder[F] extends IndexBuilder[F] {
 trait IndexBuilder[F] {
   def result():Index[F]
   def add(fs: TraversableOnce[F]):Unit
-
 }

@@ -18,17 +18,12 @@ object Textify {
       println(f)
       val out = new File(outdir, f.getName)
       val toks = preprocess(f)
-
-
       val oo = new PrintWriter(new FileWriter(out))
-
       for(line <- toks) {
         oo.println(line.mkString("\t"))
       }
-
       oo.close()
     }
-
   }
 
 }

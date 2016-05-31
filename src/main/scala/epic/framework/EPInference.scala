@@ -36,16 +36,14 @@ class EPInference[Datum, Augment <: AnyRef](val inferences: IndexedSeq[Projectab
 
   def scorer(v: Datum): Scorer = EPScorer(inferences.map(_.scorer(v)))
 
-
   override def forTesting = new EPInference(inferences.map(_.forTesting), maxEPIter, epInGold)
-
 
   // ugh code duplication...
   def goldMarginal(scorer: Scorer, datum: Datum, augment: Augment): Marginal = {
-    if(!epInGold) {
-      val marginals = for(i <- 0 until inferences.length) yield {
+    if (!epInGold) {
+      val marginals = inferences.indices.map { i =>
         val inf = inferences(i)
-        if(inf eq null)
+        if (inf eq null)
           null.asInstanceOf[ProjectableInference[Datum, Augment]#Marginal]
         else 
           inf.goldMarginal(scorer.scorers(i).asInstanceOf[inf.Scorer], datum)
@@ -61,13 +59,9 @@ class EPInference[Datum, Augment <: AnyRef](val inferences: IndexedSeq[Projectab
     EPInference.doInference(datum, augment, inferences, scorer, (inf:ProjectableInference[Datum, Augment], scorer: ProjectableInference[Datum, Augment]#Scorer, q: Augment) => inf.marginal(scorer.asInstanceOf[inf.Scorer], datum, q), maxEPIter)
   }
 
-
-
 }
 
-
 case class EPMarginal[Augment, Marginal](logPartition: Double, q: Augment, marginals: IndexedSeq[Marginal]) extends epic.framework.Marginal
-
 
 object EPInference extends SafeLogging {
   val iters, calls = new AtomicLong(0)
@@ -103,11 +97,11 @@ object EPInference extends SafeLogging {
       }
       val newAugment = inf.project(datum, iScorer.asInstanceOf[inf.Scorer], marg.asInstanceOf[inf.Marginal], q)
       marginals(i) = marg
-//      println("Leaving " + i)
+      // println("Leaving " + i)
       newAugment -> contributionToLikelihood
     }
     val ep = new ExpectationPropagation(project _, convergenceThreshold)
-    val inferencesToUse = (0 until inferences.length).filter(inferences(_) ne null)
+    val inferencesToUse = inferences.indices.filter(inferences(_) ne null)
 
     var state: ep.State = null
     val iterates = ep.inference(augment, inferencesToUse, inferencesToUse.map(i => inferences(i).baseAugment(datum)))
@@ -117,7 +111,7 @@ object EPInference extends SafeLogging {
       state = s
     }
     EPInference.iters.addAndGet(iter)
-    if(EPInference.calls.incrementAndGet % 1000 == 0) {
+    if (EPInference.calls.incrementAndGet % 1000 == 0) {
       val calls = EPInference.calls.get()
       val iters = EPInference.iters.get()
       logger.info(s"EP Stats $iters $calls ${iters * 1.0 / calls} $maxEPIter")

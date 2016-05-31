@@ -27,7 +27,7 @@ import breeze.collection.mutable.TriangularArray
  * @tparam L
  */
 trait GoldTagPolicy[L] {
-  def isGoldSpan(start: Int, end: Int):Boolean
+  def isGoldSpan(start: Int, end: Int): Boolean
   def isGoldTopTag(start: Int, end: Int, tag: Int): Boolean
   def isGoldBotTag(start: Int, end: Int, tag: Int): Boolean
 }
@@ -36,16 +36,16 @@ object GoldTagPolicy {
   def noGoldTags[L]:GoldTagPolicy[L] = new GoldTagPolicy[L] {
     def isGoldTopTag(start: Int, end: Int, tag: Int): Boolean = false
     def isGoldBotTag(start: Int, end: Int, tag: Int): Boolean = false
-    def isGoldSpan(start: Int, end: Int):Boolean = false
+    def isGoldSpan(start: Int, end: Int): Boolean = false
   }
 
   def goldTreeForcing[L](trees: BinarizedTree[Int]*):GoldTagPolicy[L] ={
     val goldTop = TriangularArray.raw(trees.head.span.end+1,collection.mutable.BitSet())
     val goldBot = TriangularArray.raw(trees.head.span.end+1,collection.mutable.BitSet())
     for(tree <- trees) {
-      if(tree != null) {
+      if (tree != null) {
         for( t <- tree.allChildren if t.label != -1) {
-          if(t.children.size == 1)
+          if (t.children.size == 1)
             goldTop(TriangularArray.index(t.span.begin,t.span.end)) += t.label
           else
             goldBot(TriangularArray.index(t.span.begin,t.span.end)) += t.label
@@ -53,7 +53,7 @@ object GoldTagPolicy {
       }
     }
     new GoldTagPolicy[L] {
-      def isGoldSpan(start: Int, end: Int):Boolean = {
+      def isGoldSpan(start: Int, end: Int): Boolean = {
         val set = goldTop(TriangularArray.index(start,end))
         set != null && set.nonEmpty
       }

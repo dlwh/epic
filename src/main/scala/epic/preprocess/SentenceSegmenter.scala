@@ -20,7 +20,6 @@ trait SentenceSegmenter extends StringAnalysisFunction[Any, Sentence] with (Stri
 
 }
 
-
 object SegmentSentences {
   case class Params(splitOnNewline: Boolean = false)
   def main(_args: Array[String]):Unit = {
@@ -28,7 +27,7 @@ object SegmentSentences {
     val params = config.readIn[Params]()
     import params._
 
-    val ins = if(args.isEmpty) IndexedSeq(System.in) else args.toStream.map(new FileInputStream(_))
+    val ins = if (args.isEmpty) IndexedSeq(System.in) else args.toStream.map(new FileInputStream(_))
     val streaming = new StreamSentenceSegmenter(MLSentenceSegmenter.bundled().get, segmentOnNewLines = params.splitOnNewline)
     for(in <- ins) {
       try {

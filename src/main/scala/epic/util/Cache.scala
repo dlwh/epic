@@ -16,17 +16,17 @@ case class CacheBroker(path: File = null, copyFrom: File = null, clearCaches: St
   @transient
   private var _actualCache:CacheBroker.ActualCache = null
   private def actualCache = synchronized {
-    lazy val dbMaker = if(path eq null) {
+    lazy val dbMaker = if (path eq null) {
       DBMaker.newMemoryDB()
     } else {
       DBMaker.newFileDB(path)
     }.closeOnJvmShutdown().cacheSoftRefEnable()
 
-    if(_actualCache eq null) {
+    if (_actualCache eq null) {
       _actualCache = CacheBroker.getCacheBroker(path, dbMaker, autocommit, copyFrom)
     }
-    if(disableWriteAheadLog) _actualCache.dbMaker.writeAheadLogDisable()
-    if(clearCaches != null && clearCaches.nonEmpty)
+    if (disableWriteAheadLog) _actualCache.dbMaker.writeAheadLogDisable()
+    if (clearCaches != null && clearCaches.nonEmpty)
       for(toDisable <- clearCaches.split(",")) {
         _actualCache.db.getHashMap(toDisable).clear()
       }
@@ -34,10 +34,8 @@ case class CacheBroker(path: File = null, copyFrom: File = null, clearCaches: St
     _actualCache
   }
 
-
   def dbMaker = actualCache.dbMaker
   def db = actualCache.db
-
 
   def commit() { db.commit()}
   def close() {actualCache.close()}
@@ -50,22 +48,22 @@ object CacheBroker extends LazyLogging {
   private class ActualCache private[CacheBroker] (val path: File, val dbMaker: DBMaker, val autocommit: Boolean, copyFrom: File = null) {
     lazy val db = {
       val db = dbMaker.make()
-      if(copyFrom != null) {
+      if (copyFrom != null) {
         logger.info(s"Copying database from $copyFrom to ${if (path ne null) path else "in memory database"}")
         val from = DBMaker.newFileDB(copyFrom).make()
         Pump.copy(from, db)
         from.close()
       }
-      if(autocommit) cacheThread.start()
+      if (autocommit) cacheThread.start()
 
       db
     }
     private lazy val cacheThread: Thread = new Thread(new Runnable {
       def run() {
         try {
-          while(!db.isClosed && !Thread.interrupted()) {
+          while (!db.isClosed && !Thread.interrupted()) {
             Thread.sleep(1000 * 60)
-            if(!db.isClosed)
+            if (!db.isClosed)
               db.commit()
           }
         } catch {
@@ -88,10 +86,9 @@ object CacheBroker extends LazyLogging {
   private val cacheCache = Collections.synchronizedMap(new util.HashMap[File, ActualCache]()).asScala
 
   private def getCacheBroker(path: File, dbMaker: =>DBMaker, autocommit: Boolean, copyFrom: File) = {
-    if(path eq null) new ActualCache(path, dbMaker, autocommit)
+    if (path eq null) new ActualCache(path, dbMaker, autocommit)
     else cacheCache.getOrElseUpdate(path, new ActualCache(path, dbMaker, autocommit, copyFrom))
   }
-
 
   @SerialVersionUID(1L)
   private class CacheMap[K, V](name: String, cache: CacheBroker)(implicit kser: Serializer[K], vser: Serializer[V]) extends Map[K, V] with Serializable {
@@ -99,7 +96,7 @@ object CacheBroker extends LazyLogging {
     @transient
     private var _theMap : Map[K, V] = null
     def theMap = synchronized {
-      if(_theMap eq null) {
+      if (_theMap eq null) {
         _theMap = try {
           // this throws if the hash map exists, and there's no "does it exist" method
           // that takes the serializers...
@@ -110,7 +107,6 @@ object CacheBroker extends LazyLogging {
       }
       _theMap
     }
-
 
     def +=(kv: (K, V)): this.type = {theMap += kv; this}
 

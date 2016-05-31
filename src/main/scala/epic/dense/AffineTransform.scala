@@ -12,7 +12,6 @@ case class AffineTransform[FV, Mid](numOutputs: Int, numInputs: Int, innerTransf
                               (implicit mult: OpMulMatrix.Impl2[DenseMatrix[Double], Mid, DenseVector[Double]],
                                canaxpy: scaleAdd.InPlaceImpl3[DenseVector[Double], Double, Mid]) extends Transform[FV, DenseVector[Double]] {
 
-
   val index = SegmentedIndex(new AffineTransform.Index(numOutputs, numInputs, includeBias), innerTransform.index)
 
   def extractLayer(weights: DenseVector[Double], forTrain: Boolean) = {
@@ -21,7 +20,7 @@ case class AffineTransform[FV, Mid](numOutputs: Int, numInputs: Int, innerTransf
   
   def extractLayerAndPenultimateLayer(weights: DenseVector[Double], forTrain: Boolean) = {
     val mat = weights(0 until (numOutputs * numInputs)).asDenseMatrix.reshape(numOutputs, numInputs, view = View.Require)
-    val bias = if(includeBias) {
+    val bias = if (includeBias) {
       weights(numOutputs * numInputs until index.componentOffset(1))
     } else {
       DenseVector.zeros[Double](numOutputs)
@@ -58,8 +57,7 @@ case class AffineTransform[FV, Mid](numOutputs: Int, numInputs: Int, innerTransf
     override val index = AffineTransform.this.index
 
     val weightst = weights.t
-//    val weightst = weights.t.copy
-
+    // val weightst = weights.t.copy
 
     def activations(fv: FV) = {
       val out = weights * innerLayer.activations(fv) += bias
@@ -67,10 +65,10 @@ case class AffineTransform[FV, Mid](numOutputs: Int, numInputs: Int, innerTransf
     }
 
     def tallyDerivative(deriv: DenseVector[Double], _scale: =>Vector[Double], fv: FV) = {
-//      println("SCALE: " + _scale) 
+    // println("SCALE: " + _scale)
       val scale = _scale
       val matDeriv = deriv(0 until (numOutputs * numInputs)).asDenseMatrix.reshape(numOutputs, numInputs, view = View.Require)
-      val biasDeriv = if(includeBias) {
+      val biasDeriv = if (includeBias) {
         deriv(numOutputs * numInputs until index.componentOffset(1))
       } else {
         DenseVector.zeros[Double](numOutputs)
@@ -82,18 +80,18 @@ case class AffineTransform[FV, Mid](numOutputs: Int, numInputs: Int, innerTransf
       // d/d(weights(::, i)) == scale(i) * innerAct
       for (i <- 0 until weights.rows) {
         val a: Double = scale(i)
-        if(a != 0.0) {
+        if (a != 0.0) {
           axpy(a, innerAct, matDeriv.t(::, i))
         // so d/dbias(i) = scale(i)
           biasDeriv(i) += a
         }
       }
 
-//      biasDeriv += scale
+      // biasDeriv += scale
 
       // scale is f'(mat * inner(v) + bias)
       // d/dv is mat.t * f'(mat * inner(v) + bias)
-//      println("Intermediate scale: " + weightst * scale)
+      // println("Intermediate scale: " + weightst * scale)
       innerLayer.tallyDerivative(deriv(index.componentOffset(1) to -1), weightst * scale, fv)
     }
     
@@ -108,8 +106,7 @@ object AffineTransform {
                                                                     canAxpy: scaleAdd.InPlaceImpl3[DenseVector[Double], Double, FV]) = new AffineTransform(numOutputs, numInputs, new IdentityTransform[FV], includeBias)
   def apply(numOutputs: Int, numInputs: Int, includeBias: Boolean):AffineTransform[DenseVector[Double], DenseVector[Double]] = apply(numOutputs, numInputs, new IdentityTransform[DenseVector[Double]], includeBias)
   def apply(numOutputs: Int, numInputs: Int):AffineTransform[DenseVector[Double], DenseVector[Double]]  = apply(numOutputs, numInputs, true)
-  
-  
+
   def getUniformAffineWeights(numWeights: Int, initWeightsScale: Double, rng: Random) = {
     DenseVector(Array.tabulate(numWeights)(i => rng.nextGaussian * initWeightsScale))
   }
@@ -160,7 +157,7 @@ object AffineTransform {
 
     def iterator: Iterator[Feature] = Iterator.range(0, size) map unapply map (_.get)
 
-    override val size: Int = if(includeBias) numOutputs * numInputs + numOutputs else numOutputs * numInputs
+    override val size: Int = if (includeBias) numOutputs * numInputs + numOutputs else numOutputs * numInputs
 
     override def toString() = ScalaRunTime._toString(this)
   }

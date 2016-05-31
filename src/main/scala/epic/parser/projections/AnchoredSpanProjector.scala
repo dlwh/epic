@@ -45,21 +45,17 @@ class AnchoredSpanProjector(threshold: Double = Double.NegativeInfinity) extends
     val totals = TriangularArray.fill[DenseVector[Double]](length+1)(labelBeliefs)
     val totalsUnaries = TriangularArray.fill[DenseVector[Double]](length+1)(labelBeliefs)
 
-
     val visitor = new AnchoredVisitor[L] {
       def visitSpan(begin: Int, end: Int, tag: Int, ref: Int, score: Double): Unit = {
         // fill in spans with 0 if they're active
-        if(score > 0.0) {
+        if (score > 0.0) {
           totals(begin, end)(tag) += score
         }
       }
 
-
       override def skipBinaryRules: Boolean = true
 
-      def visitBinaryRule(begin: Int, split: Int, end: Int, rule: Int, ref: Int, count: Double): Unit = {
-
-      }
+      def visitBinaryRule(begin: Int, split: Int, end: Int, rule: Int, ref: Int, count: Double): Unit = ()
 
       def visitUnaryRule(begin: Int, end: Int, rule: Int, ref: Int, count: Double): Unit = {
         if (count > 0.0)
@@ -68,17 +64,11 @@ class AnchoredSpanProjector(threshold: Double = Double.NegativeInfinity) extends
 
     }
 
-
     charts.visitPostorder(visitor, threshold)
 
     new AnchoredSpanProjector.AnchoredData(totalsUnaries, totals)
   }
 }
-
-
-
-
-
 
 object AnchoredSpanProjector {
 

@@ -69,18 +69,14 @@ final case class GrammarRefinements[C, F](labels: ProjectionIndexer[C, F], rules
   }
 
   /** Gives the localized refinement of each parent */
-  def parentRefinement(r: Int, ref: Int):Int = parentRefinements(r)(ref)
+  def parentRefinement(r: Int, ref: Int): Int = parentRefinements(r)(ref)
 
   private val parentRefinements: Array[Array[Int]] = Array.tabulate(rules.coarseIndex.size) { r =>
     val parent = labels.coarseIndex(rules.coarseIndex.get(r).parent)
-
     rules.refinementsOf(r).map { ref =>
       labels.localize(rules.fineIndex.get(ref).parent)._2
     }
-
-
   }
-
 
   // rule -> parentRef -> [ruleRef]
   private val parentCompatibleRefinements: Array[Array[Array[Int]]] = Array.tabulate(rules.coarseIndex.size) { r =>
@@ -94,7 +90,7 @@ final case class GrammarRefinements[C, F](labels: ProjectionIndexer[C, F], rules
   }
 
   private val leftChildCompatibleRefinements: Array[Array[Array[Int]]] = Array.tabulate(rules.coarseIndex.size) { r =>
-    if(rules.coarseIndex.get(r).isInstanceOf[UnaryRule[C]]) {
+    if (rules.coarseIndex.get(r).isInstanceOf[UnaryRule[C]]) {
       null
     } else {
       val leftChild = labels.coarseIndex(rules.coarseIndex.get(r).asInstanceOf[BinaryRule[C]].left)
@@ -108,10 +104,9 @@ final case class GrammarRefinements[C, F](labels: ProjectionIndexer[C, F], rules
   }
 
   private val rightChildCompatibleRefinements: Array[Array[Array[Int]]] = Array.tabulate(rules.coarseIndex.size) { r =>
-    if(rules.coarseIndex.get(r).isInstanceOf[UnaryRule[C]]) {
+    if (rules.coarseIndex.get(r).isInstanceOf[UnaryRule[C]]) {
       null
     } else {
-
       val rightChild = labels.coarseIndex(rules.coarseIndex.get(r).asInstanceOf[BinaryRule[C]].right)
       val rightChildRefs = Array.fill(labels.refinementsOf(rightChild).length){ArrayBuffer[Int]()}
       for(ruleRef <- rules.refinementsOf(r)) {
@@ -124,7 +119,7 @@ final case class GrammarRefinements[C, F](labels: ProjectionIndexer[C, F], rules
 
   // rule -> parentRef -> [ruleRef]
   private val childCompatibleRefinements: Array[Array[Array[Int]]] = Array.tabulate(rules.coarseIndex.size) { r =>
-    if(rules.coarseIndex.get(r).isInstanceOf[UnaryRule[C]]) {
+    if (rules.coarseIndex.get(r).isInstanceOf[UnaryRule[C]]) {
       val child = labels.coarseIndex(rules.coarseIndex.get(r).asInstanceOf[UnaryRule[C]].child)
       val childRefs = Array.fill(labels.refinementsOf(child).length){ArrayBuffer[Int]()}
       for(ruleRef <- rules.refinementsOf(r)) {
@@ -138,14 +133,13 @@ final case class GrammarRefinements[C, F](labels: ProjectionIndexer[C, F], rules
   }
 
   private val coarseRulesGivenParentRefinement = Array.tabulate(labels.coarseIndex.size) { p =>
-  // refinement -> rules
+    // refinement -> rules
     val result = Array.fill(labels.refinementsOf(p).length)(ArrayBuffer[Int]())
-    for( (rule, r) <- rules.coarseIndex.pairs if labels.coarseIndex(rule.parent) == p && rule.isInstanceOf[BinaryRule[_]]; ref <- 0 until result.length) {
-      if(parentCompatibleRefinements(r)(ref).nonEmpty) {
+    for( (rule, r) <- rules.coarseIndex.pairs if labels.coarseIndex(rule.parent) == p && rule.isInstanceOf[BinaryRule[_]]; ref <- result.indices) {
+      if (parentCompatibleRefinements(r)(ref).nonEmpty) {
         result(ref) += r
       }
     }
-
     result.map(_.toArray)
   }
 
@@ -156,7 +150,7 @@ final case class GrammarRefinements[C, F](labels: ProjectionIndexer[C, F], rules
   }
 
   private val leftChildRefinementsGivenCoarseRule:Array[Array[Int]] = Array.tabulate(rules.coarseIndex.size) { r =>
-    if(rules.coarseIndex.get(r).isInstanceOf[UnaryRule[_]]) Array.empty
+    if (rules.coarseIndex.get(r).isInstanceOf[UnaryRule[_]]) Array.empty
     else {
       def fineLeftChild(r: Int) = labels.fineIndex(rules.fineIndex.get(r).asInstanceOf[BinaryRule[F]].left)
       rules.refinementsOf(r).map(fineLeftChild).toSet.toArray.map(labels.localize).sorted
@@ -164,7 +158,7 @@ final case class GrammarRefinements[C, F](labels: ProjectionIndexer[C, F], rules
   }
 
   private val rightChildRefinementsGivenCoarseRule:Array[Array[Int]] = Array.tabulate(rules.coarseIndex.size) { r =>
-    if(rules.coarseIndex.get(r).isInstanceOf[UnaryRule[_]]) Array.empty
+    if (rules.coarseIndex.get(r).isInstanceOf[UnaryRule[_]]) Array.empty
     else {
       def fineRightChild(r: Int) = labels.fineIndex(rules.fineIndex.get(r).asInstanceOf[BinaryRule[F]].right)
       rules.refinementsOf(r).map(fineRightChild).toSet.toArray.map(labels.localize).sorted

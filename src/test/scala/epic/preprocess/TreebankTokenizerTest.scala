@@ -5,7 +5,7 @@ import org.scalatest.FunSuite
 class TreebankTokenizerTest  extends FunSuite {
 
   private def isOneToken(w: String) =
-    if(w === TreebankTokenizer(w).head) None else Some(w + " " +  TreebankTokenizer(w))
+    if (w === TreebankTokenizer(w).head) None else Some(w + " " +  TreebankTokenizer(w))
 
   test("simple words") {
     val words = List("Hi","there","pilgrim","happy","Thanksgiving","there")

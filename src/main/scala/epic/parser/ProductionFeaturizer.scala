@@ -28,12 +28,12 @@ import epic.features.IndicatorFeature
  */
 @SerialVersionUID(1L)
 class ProductionFeaturizer[L, L2, W](val topology: RuleTopology[L], refinements: GrammarRefinements[L, L2],
-                                     lGen: L2=>Seq[Feature] = {(x:L2)=>if(x.isInstanceOf[Feature]) Seq(x.asInstanceOf[Feature]) else Seq(IndicatorFeature(x))},
+                                     lGen: L2=>Seq[Feature] = {(x:L2)=>if (x.isInstanceOf[Feature]) Seq(x.asInstanceOf[Feature]) else Seq(IndicatorFeature(x))},
                                      rGen: Rule[L2] => Seq[Feature] = {(x: Rule[L2]) => Seq(x)},
                                      filterRedundantFeatures: Boolean = false) extends RefinedFeaturizer[L, W, Feature] with Serializable {
 
   private val (index_ :Index[Feature], ruleFeatures: Array[Array[Int]], labelFeatures: Array[Array[Int]]) = {
-    if(filterRedundantFeatures) {
+    if (filterRedundantFeatures) {
       val index = epic.features.buildNonRedundantFeatureIndex[Either[Rule[L2], L2], Feature](refinements.rules.fineIndex.iterator.map(Left(_)) ++ refinements.labels.fineIndex.iterator.map(Right(_)), {
         case Left(r) => rGen(r)
         case Right(l) => lGen(l)
@@ -62,7 +62,6 @@ class ProductionFeaturizer[L, L2, W](val topology: RuleTopology[L], refinements:
   def featuresForRule(r: Int): Array[Int] = ruleFeatures(r)
 
   def featuresForLabel(l: Int): Array[Int] = labelFeatures(l)
-
 
   override def lock: RefinedFeaturizer[L, W, Feature] = this
 

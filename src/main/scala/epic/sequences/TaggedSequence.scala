@@ -14,17 +14,10 @@ case class TaggedSequence[+L, +W](tags: IndexedSeq[L],
 
   require(tags.length == words.length)
 
-  def render = {
-    (tags zip words map { case (t, w) => w +"/" + t}).mkString(" ")
-  }
-
+  def render = (tags zip words map { case (t, w) => w +"/" + t}).mkString(" ")
   def pairs = tags zip words
-
   def features = words
-
   def length: Int = words.length
-
   def label: IndexedSeq[L] = tags
-
   def asSegmentation = Segmentation(tags.zipWithIndex.map{case (l, i) => (l -> Span(i, i+1))}, words, id+"-seg")
 }

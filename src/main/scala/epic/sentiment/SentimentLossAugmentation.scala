@@ -20,7 +20,7 @@ case class SentimentLossAugmentation[W](trainTrees: IndexedSeq[TreeInstance[Anno
 
   val losses = Array.tabulate(5,5)(loss)
 
-  def projectedLabel(l: AnnotatedLabel) =   if(l == AnnotatedLabel.TOP) -1 else l.label.toInt
+  def projectedLabel(l: AnnotatedLabel) =   if (l == AnnotatedLabel.TOP) -1 else l.label.toInt
   val sentimentScores: Array[Int] = topology.labelEncoder.tabulateArray(projectedLabel)
 
   val trainingMap = trainTrees.iterator.map(ti => ti.words -> ti).toMap
@@ -28,10 +28,8 @@ case class SentimentLossAugmentation[W](trainTrees: IndexedSeq[TreeInstance[Anno
   def lossAugmentation(datum: TreeInstance[AnnotatedLabel, W]): UnrefinedGrammarAnchoring[AnnotatedLabel, W] = {
     // drop the root
     val goldMap = datum.tree.map(projectedLabel).preorder.filter(_.label != -1).map{t => t.span -> t.label}.toMap
-
     new SentimentLossAnchoring(topology, lexicon, datum.words, goldMap, constraintFactory.constraints(datum.words))
   }
-
 
   /**
    * Returns a [[epic.parser.UnrefinedGrammarAnchoring]] for this particular sentence.
@@ -60,10 +58,10 @@ case class SentimentLossAugmentation[W](trainTrees: IndexedSeq[TreeInstance[Anno
         case Some(goldLabel) =>
           assert(goldLabel != -1)
           val guessLabel = sentimentScores(tag)
-          if(guessLabel == -1) {
+          if (guessLabel == -1) {
             breeze.numerics.I(goldLabel == guessLabel) * 10000
           } else {
-            losses(goldLabel)(guessLabel) * (if (begin == 0 && end == words.size) rootLossScaling else 1.0);
+            losses(goldLabel)(guessLabel) * (if (begin == 0 && end == words.size) rootLossScaling else 1.0)
           }
         case None =>
            0
@@ -71,7 +69,6 @@ case class SentimentLossAugmentation[W](trainTrees: IndexedSeq[TreeInstance[Anno
     }
 
   }
-
 
 }
 
@@ -86,6 +83,6 @@ object SentimentLossAugmentation {
       if (guess == 2) 0 else 1
     }
   }
-  def hammingLoss(gold: Int, guess: Int) = if (gold != guess) 1 else 0;
+  def hammingLoss(gold: Int, guess: Int) = if (gold != guess) 1 else 0
   def noLoss(gold: Int, guess: Int) = 0
 }

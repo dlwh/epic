@@ -83,7 +83,6 @@ trait ParseMarginal[L, W] extends VisitableMarginal[AnchoredVisitor[L]] {
 
 object ParseMarginal {
 
-
   trait Factory[L, W] {
     def apply(w: IndexedSeq[W], constraints: ChartConstraints[L]):ParseMarginal[L, W]
   }
@@ -123,11 +122,10 @@ object ParseMarginal {
 case class StandardChartFactory[L, W](refinedGrammar: Grammar[L, W], maxMarginal: Boolean = false) extends ParseMarginal.Factory[L, W] {
   def apply(w: IndexedSeq[W], constraints: ChartConstraints[L]):RefinedChartMarginal[L, W] = {
       val marg = RefinedChartMarginal(refinedGrammar.anchor(w, constraints), maxMarginal = maxMarginal)
-      if(!marg.logPartition.isInfinite) {
+      if (!marg.logPartition.isInfinite) {
         marg
       } else {
         RefinedChartMarginal(refinedGrammar.withPermissiveLexicon.anchor(w, constraints), maxMarginal = maxMarginal)
       }
-
   }
 }

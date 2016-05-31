@@ -28,19 +28,14 @@ import epic.trees.Span
 case class RegexSearchTokenizer(pattern : String) extends Tokenizer {
   private val compiled = pattern.r
 
-
   def apply[In <: Sentence](slab:StringSlab[In]):StringSlab[In with Token] = {
     slab.addLayer[Token](slab.iterator[Sentence].flatMap { s =>
       compiled.findAllMatchIn(slab.spanned(s._1)).map{ m => Span(m.start, m.end) -> new Token(m.group(0))}
     })
   }
 
-
-
-
-
-//  override def apply(doc : String) = new Iterable[String] {
-//    override def iterator = (pattern.r.findAllIn(doc));
-//  }
+  // override def apply(doc : String) = new Iterable[String] {
+  //   override def iterator = (pattern.r.findAllIn(doc));
+  // }
   override def toString: String = ScalaRunTime._toString(this)
 }

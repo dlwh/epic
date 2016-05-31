@@ -45,7 +45,7 @@ trait Slab[ContentType, RegionType, +AnnotationTypes] {
 
   /** useful for downcasting */
   def checkedCast[A: ClassTag]:Option[Slab[ContentType, RegionType, AnnotationTypes with A]] = {
-    if(!hasLayer[A]) {
+    if (!hasLayer[A]) {
       None
     } else {
       Some(this.asInstanceOf[Slab[ContentType, RegionType, AnnotationTypes with A]])
@@ -81,10 +81,8 @@ trait Slab[ContentType, RegionType, +AnnotationTypes] {
   def stringRep[A >: AnnotationTypes: ClassTag] = {
     iterator[A].mkString("\n")
   }
-  
-  
-}
 
+}
 
 object AnnotatedSpan {
 
@@ -124,7 +122,7 @@ case class EntityMention(entityType: String, id: Option[String] = None)
 object Slab {
 
   trait ExtractRegion[Region, T] {
-    def apply(region: Region, t: T):T
+    def apply(region: Region, t: T): T
   }
 
   implicit object SpanStringExtractRegion extends ExtractRegion[Span, String] {
@@ -148,7 +146,6 @@ object Slab {
                                                          val annotations: Map[Class[_], Vector[(Span, Any)]] = Map.empty,
                                                          val reverseAnnotations: Map[Class[_], Vector[(Span, Any)]] = Map.empty)(implicit extract: ExtractRegion[Span, ContentType]) extends Slab[ContentType, Span, AnnotationType] {
 
-
     override def spanned(region: Span): ContentType = extract(region, content)
 
     override def addLayer[A:ClassTag](annotations: TraversableOnce[(Span, A)]): Slab[ContentType, Span, AnnotationType with A] = {
@@ -164,13 +161,11 @@ object Slab {
       new SortedSequenceSlab(content, newAnnotations, reverseAnnotations)
     }
 
-
     override def removeLayer[A >: AnnotationType: ClassTag]: Slab[ContentType, Span, AnnotationType] = {
       new SortedSequenceSlab(content,
         annotations - implicitly[ClassTag[A]].runtimeClass,
         reverseAnnotations - implicitly[ClassTag[A]].runtimeClass)
     }
-
 
     /** Queries whether we have annotations of this type, even if the slab
       * doesn't have this type. Sometimes you just have to cast... */
@@ -181,23 +176,23 @@ object Slab {
     override def following[A >: AnnotationType: ClassTag](region: Span): Iterator[(Span, A)] = {
       val annotations = selectAnnotations[A]
       var pos = BinarySearch.interpolationSearch(annotations, (_:(Span, Any))._1.begin, region.end)
-      if(pos < 0) pos = ~pos
+      if (pos < 0) pos = ~pos
       annotations.view(pos, annotations.length).iterator
     }
 
     override def preceding[A >: AnnotationType : ClassTag](region: Span): Iterator[(Span, A)] = {
       val annotations = selectReverse[A]
       var pos = BinarySearch.interpolationSearch(annotations, (_:(Span, Any))._1.end, region.begin + 1)
-      if(pos < 0) pos = ~pos
+      if (pos < 0) pos = ~pos
       annotations.view(0, pos).reverseIterator
     }
 
     override def covered[A >: AnnotationType : ClassTag](region: Span): IndexedSeq[(Span, A)] = {
       val annotations = selectAnnotations[A]
       var begin = BinarySearch.interpolationSearch(annotations, (_:(Span, Any))._1.begin, region.begin)
-      if(begin < 0) begin = ~begin
+      if (begin < 0) begin = ~begin
       var end = annotations.indexWhere(_._1.end > region.end, begin)
-      if(end < 0) end = annotations.length
+      if (end < 0) end = annotations.length
       annotations.slice(begin, end)
     }
 
@@ -222,8 +217,5 @@ object Slab {
     }
 
   }
-
-
-
 
 }

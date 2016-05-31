@@ -16,12 +16,11 @@ import scala.util.Random
  */
 case class AffineOutputTransform[FV](numOutputs: Int, numInputs: Int, innerTransform: Transform[FV, DenseVector[Double]], includeBias: Boolean = true) extends OutputTransform[FV, DenseVector[Double]] {
 
-
   val index = SegmentedIndex(new AffineTransform.Index(numOutputs, numInputs, includeBias), innerTransform.index)
   
   def extractLayerAndPenultimateLayer(weights: DenseVector[Double], forTrain: Boolean) = {
     val mat = weights(0 until (numOutputs * numInputs)).asDenseMatrix.reshape(numOutputs, numInputs, view = View.Require)
-    val bias = if(includeBias) {
+    val bias = if (includeBias) {
       weights(numOutputs * numInputs until index.componentOffset(1))
     } else {
       DenseVector.zeros[Double](numOutputs)
@@ -51,8 +50,7 @@ case class AffineOutputTransform[FV](numOutputs: Int, numInputs: Int, innerTrans
     override val index = AffineOutputTransform.this.index
 
     val weightst = weights.t
-//    val weightst = weights.t.copy
-
+    //val weightst = weights.t.copy
 
     def activations(fv: FV) = {
       val out = weights * innerLayer.activations(fv) += bias
@@ -74,7 +72,7 @@ case class AffineOutputTransform[FV](numOutputs: Int, numInputs: Int, innerTrans
     def tallyDerivative(deriv: DenseVector[Double], _scale: =>Vector[Double], fv: FV) = {
       val scale = _scale
       val matDeriv = deriv(0 until (numOutputs * numInputs)).asDenseMatrix.reshape(numOutputs, numInputs, view = View.Require)
-      val biasDeriv = if(includeBias) {
+      val biasDeriv = if (includeBias) {
         deriv(numOutputs * numInputs until index.componentOffset(1))
       } else {
         DenseVector.zeros[Double](numOutputs)
@@ -86,7 +84,7 @@ case class AffineOutputTransform[FV](numOutputs: Int, numInputs: Int, innerTrans
       // d/d(weights(::, i)) == scale(i) * innerAct
       for (i <- 0 until weights.rows) {
         val a: Double = scale(i)
-        if(a != 0.0) {
+        if (a != 0.0) {
           axpy(a, innerAct, matDeriv.t(::, i))
         // so d/dbias(i) = scale(i)
           biasDeriv(i) += a

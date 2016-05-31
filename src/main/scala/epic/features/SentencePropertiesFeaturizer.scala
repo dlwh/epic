@@ -18,29 +18,24 @@ class SentencePropertiesFeaturizer(db: DistanceBinner = new DistanceBinner()) ex
 
       def words: IndexedSeq[String] = w
 
-
       def featuresForWord(pos: Int): Array[Feature] = featuresForSpan(pos, pos+1)
 
       def featuresForSpan(begin: Int, end: Int): Array[Feature] = {
         val feats = new ArrayBuffer[Feature]()
         feats += sentenceLengthFeature
-        if(wholeSentenceIsUpperCase)
+        if (wholeSentenceIsUpperCase)
           feats += WholeSentenceIsUpperCaseFeature
-
-
-//        if (begin == 0)
-//          feats += BeginSentFeature
-//        if(end == words.length)
-//          feats += EndSentFeature
+        // if (begin == 0)
+        //  feats += BeginSentFeature
+        // if (end == words.length)
+        //  feats += EndSentFeature
         if (begin == 0 && end == words.length)
           feats += WholeSentFeature
-
         feats.toArray
       }
     }
   }
 }
-
 
 case object BeginSentFeature extends Feature
 case object EndSentFeature extends Feature

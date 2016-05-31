@@ -44,13 +44,11 @@ case class EPParserModelFactory(ep: EPParams,
                                 oldWeights: File = null) extends ParserExtractableModelFactory[AnnotatedLabel, String] {
   type MyModel = EPParserModel[AnnotatedLabel, String]
 
-
   override def make(train: IndexedSeq[TreeInstance[AnnotatedLabel, String]], topology: RuleTopology[AnnotatedLabel], lexicon: Lexicon[AnnotatedLabel, String], constrainer: Factory[AnnotatedLabel, String]): MyModel = {
     type ModelType = EPModel.CompatibleModel[TreeInstance[AnnotatedLabel, String], UnrefinedGrammarAnchoring[AnnotatedLabel, String]]
     val models = model.filterNot(_ eq null) map { model => model.make(train, topology, lexicon, constrainer): ModelType }
 
     val featureCounter = readWeights(oldWeights)
-
 
     new EPParserModel[AnnotatedLabel, String](topology, lexicon, constrainer, ep.maxIterations, featureCounter.get, false, ep.dropOutFraction)(models:_*)
   }

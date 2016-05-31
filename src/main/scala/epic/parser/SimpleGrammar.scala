@@ -103,7 +103,6 @@ object SimpleGrammar {
 
   }
 
-
   private def doCloseUnaries(matrix: DenseMatrix[Double], closureType: CloseUnaries.Value, syms: Index[AnnotatedLabel]): immutable.IndexedSeq[(UnaryRule[AnnotatedLabel], Double)] = closureType match {
     case CloseUnaries.None =>
       val probs = breeze.numerics.log(matrix)
@@ -161,13 +160,13 @@ object SimpleGrammar {
     val binaryIn = Source.fromInputStream(new FileInputStream(prefix+".binary"))
     for ( line <- binaryIn.getLines()) {
       val Array(_a,_b,_c, score) = line.split("\\s+")
-      val a = if(_a.startsWith("ROOT")) "TOP_0" else preprocessSymbol(_a)
-      val b = if(_b.startsWith("ROOT")) "TOP_0" else preprocessSymbol(_b)
-      val c = if(_c.startsWith("ROOT")) "TOP_0" else preprocessSymbol(_c)
+      val a = if (_a.startsWith("ROOT")) "TOP_0" else preprocessSymbol(_a)
+      val b = if (_b.startsWith("ROOT")) "TOP_0" else preprocessSymbol(_b)
+      val c = if (_c.startsWith("ROOT")) "TOP_0" else preprocessSymbol(_c)
       val logScore = math.log(score.toDouble)
-      if(logScore >= threshold) {
+      if (logScore >= threshold) {
         val ruleId = rules.index(BinaryRule(a,b,c).map(AnnotatedLabel(_)))
-        if(ruleId == ruleScores.length)
+        if (ruleId == ruleScores.length)
           ruleScores += logScore
         syms.index(AnnotatedLabel(a))
         syms.index(AnnotatedLabel(b))
@@ -182,10 +181,10 @@ object SimpleGrammar {
     val unclosedUnaries: DenseMatrix[Double] = DenseMatrix.eye[Double](syms.size)
     for ( line <- unaryIn.getLines()) {
       val Array(_a, _b,score) = line.split("\\s+")
-      val a = if(_a.startsWith("ROOT")) "TOP_0" else preprocessSymbol(_a)
-      val b = if(_b.startsWith("ROOT")) "TOP_0" else preprocessSymbol(_b)
+      val a = if (_a.startsWith("ROOT")) "TOP_0" else preprocessSymbol(_a)
+      val b = if (_b.startsWith("ROOT")) "TOP_0" else preprocessSymbol(_b)
       val logScore = math.log(score.toDouble)
-      if(logScore >= threshold) {
+      if (logScore >= threshold) {
         val ai = syms(AnnotatedLabel(a))
         val bi = syms(AnnotatedLabel(b))
         require(ai >= 0 && bi >= 0, a + " " + b + " " + syms)
@@ -231,7 +230,6 @@ object SimpleGrammar {
       scorer)
   }
 
-
   def preprocessSymbol(_sym: String): String = {
     val sym = if (_sym == "ROOT") "TOP" else if (_sym == "PRT|ADVP") "PRT" else _sym
     sym.replaceAll("ROOT","TOP").replaceAll("PRT\\|ADVP_[0-9]*", "PRT_0")
@@ -248,7 +246,6 @@ object SimpleGrammar {
 
   case class Anchoring[L, L2, W](grammar: SimpleGrammar[L, L2, W], words: IndexedSeq[W], override val sparsityPattern: ChartConstraints[L]) extends ProjectionsGrammarAnchoring[L, L2, W] {
 
-
     override def addConstraints(constraints: ChartConstraints[L]): GrammarAnchoring[L, W] = copy(sparsityPattern = sparsityPattern & constraints)
 
     def topology = grammar.topology
@@ -260,7 +257,7 @@ object SimpleGrammar {
     override def toString() = "SimpleRefinedGrammar.Anchoring(...)"
 
     def scoreSpan(begin: Int, end: Int, label: Int, ref: Int) = {
-      val baseScore = if(begin + 1 == end) {
+      val baseScore = if (begin + 1 == end) {
         val fullId = refinements.labels.globalize(label, ref)
         tagAnchoring.scoreTag(begin, refinements.labels.fineIndex.get(fullId))
       } else {
@@ -278,6 +275,5 @@ object SimpleGrammar {
     }
 
   }
-
 
 }

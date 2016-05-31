@@ -22,7 +22,6 @@ object TreeAnnotations {
 
   case class HeadTagAnnotation(tag: String) extends Annotation
 
-
   // KM Annotations
   trait KMAnnotation extends Annotation
 

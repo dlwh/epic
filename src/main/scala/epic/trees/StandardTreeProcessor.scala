@@ -42,15 +42,14 @@ case class StandardTreeProcessor(headFinder: HeadFinder[AnnotatedLabel] = HeadFi
     oin.defaultReadObject()
   }
 
-
   def apply(rawTree: Tree[AnnotatedLabel]):BinarizedTree[AnnotatedLabel] = {
-//    val ann = tree.map { AnnotatedLabel.parseTreebank }
+    // val ann = tree.map { AnnotatedLabel.parseTreebank }
     var detraced = traceProcessor(rawTree)
     if (removeTraces) {
       detraced = detraced.map(_.copy(index = -1))
     }
     var transformed = xox(detraced)
-    transformed = if(transformed.children.length != 1) {
+    transformed = if (transformed.children.length != 1) {
       Tree(AnnotatedLabel.TOP, IndexedSeq(transformed), transformed.span)
     } else {
       transformed
@@ -70,7 +69,4 @@ case class StandardTreeProcessor(headFinder: HeadFinder[AnnotatedLabel] = HeadFi
   }
 }
 
-object StandardTreeProcessor {
-
-
-}
+object StandardTreeProcessor

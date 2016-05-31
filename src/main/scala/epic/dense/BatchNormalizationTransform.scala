@@ -56,11 +56,11 @@ case class BatchNormalizationTransform[FV](size: Int, useBias: Boolean, inner: T
     
     val myIndex = Index[Feature]
     
-    def index = myIndex;
+    def index = myIndex
     
     def activations(fv: FV): DenseVector[Double] = {
       val act = innerLayer.activations(fv)
-      var i = 0;
+      var i = 0
       while (i < act.size) {
         act(i) = fcn.fcn(i, act(i)) + bias(i)
         i += 1
@@ -71,7 +71,7 @@ case class BatchNormalizationTransform[FV](size: Int, useBias: Boolean, inner: T
     def tallyDerivative(deriv: DenseVector[Double], _scale: =>Vector[Double], fv: FV) = {
       val biasDeriv = if (useBias) deriv(0 until size) else DenseVector[Double]()
       val scale = _scale
-      var i = 0;
+      var i = 0
       while (i < scale.size) {
         if (useBias) {
           biasDeriv(i) += scale(i)
@@ -87,8 +87,8 @@ case class BatchNormalizationTransform[FV](size: Int, useBias: Boolean, inner: T
       val mean = allActivations.reduce(_ + _) * (1.0/inputs.size)
       val variances = allActivations.map(act => (act - mean) :* (act - mean)).reduce(_ + _) * (1.0/inputs.size)
       val invStdDevs = variances.data.map(variance => 1.0/Math.sqrt(variance + 1e-6))
-//      println(mean.data.toSeq)
-//      println(invStdDevs.toSeq)
+      // println(mean.data.toSeq)
+      // println(invStdDevs.toSeq)
       fcn = new NonlinearTransform.ShiftAndScaleEach(mean.data, invStdDevs)
       innerLayer.applyBatchNormalization(inputs)
     }

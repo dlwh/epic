@@ -48,7 +48,7 @@ case class ProcessedTreebank(@Help(text="Location of the treebank directory")
     case "conllonto" => Treebank.fromOntonotesDirectory(path)
     case "spmrl" =>
       var trainPath: File = new File(path, "train")
-      if(!trainPath.exists)
+      if (!trainPath.exists)
         trainPath = new File(path, "train5k")
       val train = trainPath.listFiles().filter(_.getName.endsWith("ptb"))
       val dev = new File(path, "dev").listFiles().filter(_.getName.endsWith("ptb"))
@@ -66,17 +66,16 @@ case class ProcessedTreebank(@Help(text="Location of the treebank directory")
 
   lazy val trainTrees: IndexedSeq[TreeInstance[AnnotatedLabel, String]] = {
     var train = transformTrees(treebank.train, maxLength, collapseUnaries = true)
-    if(includeDevInTrain) train ++= transformTrees(treebank.dev, maxLength, collapseUnaries = true)
+    if (includeDevInTrain) train ++= transformTrees(treebank.dev, maxLength, collapseUnaries = true)
     train.take(numSentences)
   }
   lazy val devTrees = transformTrees(treebank.dev, 100000)
   lazy val testTrees = transformTrees(treebank.test, 1000000)
 
-
   def transformTrees(portion: treebank.Portion, maxL: Int, collapseUnaries: Boolean = false): IndexedSeq[TreeInstance[AnnotatedLabel, String]] = {
     val binarizedAndTransformed = for (
       ((tree, words), index) <- portion.trees.zipWithIndex if words.length <= maxL;
-      w2 = if(debuckwalterize) words.map(ArabicNormalization.buckwalterToUnicode) else words
+      w2 = if (debuckwalterize) words.map(ArabicNormalization.buckwalterToUnicode) else words
     ) yield {
       val name = s"${portion.name}-$index"
       makeTreeInstance(name, tree, w2, collapseUnaries)
@@ -84,7 +83,6 @@ case class ProcessedTreebank(@Help(text="Location of the treebank directory")
 
     binarizedAndTransformed.toIndexedSeq
   }
-
 
   def makeTreeInstance(name: String, tree: Tree[String], words: IndexedSeq[String], collapseUnaries: Boolean): TreeInstance[AnnotatedLabel, String] = {
     var transformed = process(tree.map(AnnotatedLabel.parseTreebank))
@@ -100,7 +98,7 @@ case class ProcessedTreebank(@Help(text="Location of the treebank directory")
       case "xbar" | "right" => HeadFinder.right[String]
       case "leftXbar" | "left" => HeadFinder.left[String]
       case "head" => if (treebankType .startsWith("spmrl")) {
-        SupervisedHeadFinder.trainHeadFinderFromFiles(supervisedHeadFinderPtbPath, supervisedHeadFinderConllPath);
+        SupervisedHeadFinder.trainHeadFinderFromFiles(supervisedHeadFinderPtbPath, supervisedHeadFinderConllPath)
       } else {
         HeadFinder.collins
       }

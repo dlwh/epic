@@ -18,6 +18,6 @@ trait EvaluableModel[Datum] extends Model[Datum] { self =>
     data.par.aggregate(None:Option[EvaluationResult])({(res, datum) =>
       val result = evaluate(inf.annotate(datum, inf.marginal(datum)), datum, logResults)
       Some(res.foldLeft(result)(_ + _))
-    }, {(a,b) => if(a.isEmpty) b else if(b.isEmpty) a else Some(a.get + b.get)}).get
+    }, {(a,b) => if (a.isEmpty) b else if (b.isEmpty) a else Some(a.get + b.get)}).get
   }
 }

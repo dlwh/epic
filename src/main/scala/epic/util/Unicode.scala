@@ -26,7 +26,6 @@ object Unicode {
     if (cp < 0) {
       return false
     }
-    
     var i = 0
     while (i < rangeStarts.length && cp < rangeStarts(i)) {
       i += 1

@@ -24,7 +24,6 @@ package epic.features
  */
 class PorterStemmer() extends (String=>String) {
   import PorterStemmer._
-
   def apply(w: String) = {
     if (w.length < 3) w.toLowerCase
     else {
@@ -46,8 +45,6 @@ object PorterStemmer extends PorterStemmer {
 
   def apply() = this
 
-
-
   private def step1(w: String) = step1c(step1b(step1a(w)))
 
   // get rid of s's
@@ -64,7 +61,7 @@ object PorterStemmer extends PorterStemmer {
     def extra(w: String) = {
       if (w.endsWith("at") || w.endsWith("bl") || w.endsWith("iz")) w + 'e'
       // double consonant:
-      else if (doublec(w) && !("lsz".contains(w.last))) w.substring(0, w.length - 1);
+      else if (doublec(w) && !"lsz".contains(w.last)) w.substring(0, w.length - 1)
       else if (m(w) == 1 && cvc(w)) w + "e"
       else w
     }
@@ -210,7 +207,6 @@ object PorterStemmer extends PorterStemmer {
       step5b(step5a(w))
   }
 
-
   private def step5a(w: String) = {
     if (w.length < 3) w
     else
@@ -238,7 +234,7 @@ object PorterStemmer extends PorterStemmer {
       var x: Seq[Char] = w.substring(firstV)
       if (x.isEmpty) m
       else {
-        while (!x.isEmpty) {
+        while (x.nonEmpty) {
           x = x.dropWhile(isVowel)
           if (x.isEmpty) return m
           m += 1
@@ -259,7 +255,7 @@ object PorterStemmer extends PorterStemmer {
     )
 
   private def doublec(w: String) = {
-    (w.length > 2 && w.last == w.charAt(w.length - 2) && isConsonant(w.last))
+    w.length > 2 && w.last == w.charAt(w.length - 2) && isConsonant(w.last)
   }
 
   def isConsonant(letter: Char) = !isVowel(letter)

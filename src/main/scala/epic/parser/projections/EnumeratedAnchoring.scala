@@ -31,12 +31,12 @@ case class AnchoredPCFGProjector[L, W](threshold: Double = Double.NegativeInfini
 
   type MyAnchoring = EnumeratedAnchoring[L, W]
   private def normalize(grammar: RuleTopology[L], ruleScores: OpenAddressHashArray[Double], totals: OpenAddressHashArray[Double]):OpenAddressHashArray[Double] = {
-    if(ruleScores eq null) null
+    if (ruleScores eq null) null
     else {
       val r = new OpenAddressHashArray[Double](ruleScores.length, Double.NegativeInfinity, ruleScores.activeSize)
       for( (rule, score) <- ruleScores.activeIterator) {
         val parent = grammar.parent(rule)
-        if(score > 0)
+        if (score > 0)
           r(rule) = math.log(score) - math.log(totals(parent))
       }
       r
@@ -44,7 +44,7 @@ case class AnchoredPCFGProjector[L, W](threshold: Double = Double.NegativeInfini
   }
 
   private def logify(ruleScores: OpenAddressHashArray[Double]):OpenAddressHashArray[Double] = {
-    if(ruleScores eq null) null
+    if (ruleScores eq null) null
     else {
       val r = new OpenAddressHashArray[Double](ruleScores.length, Double.NegativeInfinity, ruleScores.activeSize)
       for( (rule, score) <- ruleScores.activeIterator) {
@@ -61,7 +61,7 @@ case class AnchoredPCFGProjector[L, W](threshold: Double = Double.NegativeInfini
     }
 
     val normBinaries:Array[Array[OpenAddressHashArray[Double]]] = for ((splits, totals) <- binaryScores zip totalsBinaries) yield {
-      if(splits eq null) null
+      if (splits eq null) null
       else for(ruleScores <- splits) yield normalize(charts.topology, ruleScores, totals)
     }
     val sparsity = charts.anchoring.sparsityPattern
@@ -70,7 +70,6 @@ case class AnchoredPCFGProjector[L, W](threshold: Double = Double.NegativeInfini
 
 }
 
-
 /**
  * Creates anchorings for a set of trees from some parser using p(rule | sentence) marginals.
  * @author dlwh
@@ -78,7 +77,7 @@ case class AnchoredPCFGProjector[L, W](threshold: Double = Double.NegativeInfini
 @SerialVersionUID(469174684243960202L)
 case class AnchoredRuleMarginalProjector[L, W](threshold: Double = Double.NegativeInfinity) extends ChartProjector[L, W] {
   private def normalize(ruleScores: OpenAddressHashArray[Double]):OpenAddressHashArray[Double] = {
-    if(ruleScores eq null) null
+    if (ruleScores eq null) null
     else {
       val r = new OpenAddressHashArray[Double](ruleScores.length, Double.NegativeInfinity, ruleScores.activeSize)
       for( (rule, score) <- ruleScores.activeIterator) {
@@ -97,7 +96,7 @@ case class AnchoredRuleMarginalProjector[L, W](threshold: Double = Double.Negati
     val normUnaries:Array[OpenAddressHashArray[Double]] = unaryScores.map(normalize)
 
     val normBinaries:Array[Array[OpenAddressHashArray[Double]]] = for (splits <- binaryScores) yield {
-      if(splits eq null) null
+      if (splits eq null) null
       else splits.map(normalize)
     }
     val sparsity = charts.anchoring.sparsityPattern
@@ -127,7 +126,6 @@ case class EnumeratedAnchoring[L, W](topology: RuleTopology[L],
 
   override def addConstraints(cs: ChartConstraints[L]): UnrefinedGrammarAnchoring[L, W] = copy(sparsityPattern = sparsityPattern & cs)
 
-
   /**
    * Computes the pointwise division of two grammars, augmenting
    * their refinement space to reflect this. If they share the same annotationTag,
@@ -143,7 +141,6 @@ case class EnumeratedAnchoring[L, W](topology: RuleTopology[L],
     }
   }
 
-
   /**
    * Computes the point-wise division of this grammar with some other grammar.
    *
@@ -156,12 +153,11 @@ case class EnumeratedAnchoring[L, W](topology: RuleTopology[L],
       case that: EnumeratedAnchoring[L, W] => EnumeratedAnchoring.divide(this, that)
       case _ => super./(other)
     }
-
   }
 
   def scoreUnaryRule(begin: Int, end: Int, rule: Int) = {
     val forSpan = unaryScores(TriangularArray.index(begin, end))
-    if(forSpan eq null) Double.NegativeInfinity
+    if (forSpan eq null) Double.NegativeInfinity
     else forSpan(rule)
   }
 
@@ -169,24 +165,22 @@ case class EnumeratedAnchoring[L, W](topology: RuleTopology[L],
     val ti = TriangularArray.index(begin, end)
     val forSpan = binaryScores(ti)
     val cached = checkCache(split, rule, ti)
-    if(!java.lang.Double.isNaN(cached)) {
+    if (!java.lang.Double.isNaN(cached)) {
       cached
-    } else if(forSpan eq null) {
+    } else if (forSpan eq null) {
       Double.NegativeInfinity
     } else {
       val forSplit = forSpan(split - begin)
-      val result =  if(forSplit eq null) Double.NegativeInfinity
+      val result =  if (forSplit eq null) Double.NegativeInfinity
       else forSplit(rule)
-
       updateCache(split, rule, ti, result)
-
       result
     }
   }
 
   def scoreSpan(begin: Int, end: Int, tag: Int): Double = {
     val scores = spanScores(TriangularArray.index(begin, end))
-    if(scores ne null) scores(tag)
+    if (scores ne null) scores(tag)
     else Double.NegativeInfinity
   }
 
@@ -197,7 +191,7 @@ case class EnumeratedAnchoring[L, W](topology: RuleTopology[L],
   private def checkCache(splitPoint: Int, rule: Int, ti: Int) = {
     val crule = cache(splitPoint * 4)
     val cti = cache(splitPoint * 4 + 1)
-    if(rule == crule && cti == ti) {
+    if (rule == crule && cti == ti) {
       java.lang.Double.longBitsToDouble(Span(cache(splitPoint * 4 + 2), cache(splitPoint * 4 + 3)).encoded)
     } else {
       Double.NaN
@@ -219,7 +213,7 @@ object EnumeratedAnchoring {
     val newSpanScores = Array.tabulate(a.spanScores.length) { i =>
       val oldA = a.spanScores(i)
       val oldB = b.spanScores(i)
-      if(null == oldA || null == oldB) {
+      if (null == oldA || null == oldB) {
         null
       } else {
         doDivide(oldA, oldB)
@@ -229,24 +223,23 @@ object EnumeratedAnchoring {
     val newUnaryScores = Array.tabulate(a.unaryScores.length) { i =>
       val oldA = a.unaryScores(i)
       val oldB = b.unaryScores(i)
-      if(null == oldA || null == oldB) {
+      if (null == oldA || null == oldB) {
         null
       } else {
         doDivide(oldA, oldB)
       }
     }
 
-
     val newBinaryScores = Array.tabulate(a.binaryScores.length) { i =>
       val aArray = a.binaryScores(i)
       val bArray = b.binaryScores(i)
-      if(null == aArray || null == bArray) {
+      if (null == aArray || null == bArray) {
         null
       } else {
         Array.tabulate(aArray.length) { split =>
           val oldA = aArray(split)
           val oldB = bArray(split)
-          if(null == oldA || null == oldB) {
+          if (null == oldA || null == oldB) {
             null
           } else {
             doDivide(oldA, oldB)
@@ -260,21 +253,19 @@ object EnumeratedAnchoring {
   }
 
   private def doDivide(a: OpenAddressHashArray[Double], b: OpenAddressHashArray[Double]) = {
-    if(a == null || b == null) {
+    if (a == null || b == null) {
       null
     } else {
       val oah = new OpenAddressHashArray[Double](a.size, a.default, a.activeSize min b.activeSize)
-
       var off = 0
-      while(off < a.iterableSize) {
-        if(a.isActive(off)) {
+      while (off < a.iterableSize) {
+        if (a.isActive(off)) {
           val aa = a.valueAt(off)
           val ii = a.indexAt(off)
           val bb = b(ii)
-          if(aa != Double.NegativeInfinity && bb != Double.NegativeInfinity) {
+          if (aa != Double.NegativeInfinity && bb != Double.NegativeInfinity) {
             oah(ii) = aa - bb
           }
-
         }
         off += 1
       }

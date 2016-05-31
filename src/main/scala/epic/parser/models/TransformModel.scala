@@ -34,7 +34,6 @@ class TransformModel[L, L2, W](annotator: (BinarizedTree[L], IndexedSeq[W]) => B
                                val transform: Transform[FeatureVector, Vector[Double]]) extends ParserModel[L, W] {
   override type Inference = TransformModel.Inference[L, L2, W, transform.type]
 
-
   override def accumulateCounts(inf: Inference, s: Scorer, d: TreeInstance[L, W], m: Marginal, accum: ExpectedCounts, scale: Double): Unit = {
     inf.grammar.extractEcounts(m, accum.counts, scale)
     accum.loss += scale * m.logPartition
@@ -87,7 +86,6 @@ object TransformModel {
       new TransformGrammar(topology, lexicon.morePermissive, refinedTopology, refinements, labelFeaturizer, surfaceFeaturizer, layer)
     }
 
-
     def extractEcounts(m: ParseMarginal[L, W], deriv: DenseVector[Double], scale: Double): Unit = {
       val w = m.words
       val length = w.length
@@ -105,9 +103,9 @@ object TransformModel {
       def checkFlush(begin: Int, split: Int, end: Int) {
         val state: (Int, Int) = (begin, end)
         val oldState: (Int, Int) = states(split)
-        if(oldState != state) {
-          if(oldState != UNUSED) {
-            val ffeats = if(split >= length) sspec.featuresForSpan(oldState._1, oldState._2) else sspec.featuresForSplit(oldState._1, split, oldState._2)
+        if (oldState != state) {
+          if (oldState != UNUSED) {
+            val ffeats = if (split >= length) sspec.featuresForSpan(oldState._1, oldState._2) else sspec.featuresForSplit(oldState._1, split, oldState._2)
             layer.tallyDerivative(deriv, ruleCountsPerState(split) *= scale, new FeatureVector(ffeats))
             ruleCountsPerState(split) := 0.0
           }
@@ -120,33 +118,31 @@ object TransformModel {
         override def visitUnaryRule(begin: Int, end: Int, rule: Int, ref: Int, score: Double): Unit = {
                     checkFlush(begin, length, end)
                     axpy(score, new FeatureVector(lspec.featuresForUnaryRule(begin, end, rule, ref)), ruleCountsPerState(length))
-//          val ffeats = sspec.featuresForSpan(begin, end)
-//          layer.tallyDerivative(deriv, SparseVector(labelFeaturizer.index.size)(lspec.featuresForUnaryRule(begin, end, rule, ref).map(_ -> (scale * score)):_*), new FeatureVector(ffeats))
+        // val ffeats = sspec.featuresForSpan(begin, end)
+        // layer.tallyDerivative(deriv, SparseVector(labelFeaturizer.index.size)(lspec.featuresForUnaryRule(begin, end, rule, ref).map(_ -> (scale * score)):_*), new FeatureVector(ffeats))
         }
 
         override def visitSpan(begin: Int, end: Int, tag: Int, ref: Int, score: Double): Unit = {
           checkFlush(begin, length + 1, end)
           axpy(score, new FeatureVector(lspec.featuresForSpan(begin, end, tag, ref)), ruleCountsPerState(length + 1))
-//          val ffeats = sspec.featuresForSpan(begin, end)
-//          layer.tallyDerivative(deriv, SparseVector(labelFeaturizer.index.size)(lspec.featuresForSpan(begin, end, tag, ref).map(_ -> (scale * score)):_*), new FeatureVector(ffeats))
-
+          // val ffeats = sspec.featuresForSpan(begin, end)
+          // layer.tallyDerivative(deriv, SparseVector(labelFeaturizer.index.size)(lspec.featuresForSpan(begin, end, tag, ref).map(_ -> (scale * score)):_*), new FeatureVector(ffeats))
         }
 
         override def visitBinaryRule(begin: Int, split: Int, end: Int, rule: Int, ref: Int, score: Double): Unit = {
-//          val ffeats = sspec.featuresForSplit(begin, split, end)
-//          layer.tallyDerivative(deriv, SparseVector(labelFeaturizer.index.size)(lspec.featuresForBinaryRule(begin, split, end, rule, ref).map(_ -> (scale * score)):_*), new FeatureVector(ffeats))
+          // val ffeats = sspec.featuresForSplit(begin, split, end)
+          // layer.tallyDerivative(deriv, SparseVector(labelFeaturizer.index.size)(lspec.featuresForBinaryRule(begin, split, end, rule, ref).map(_ -> (scale * score)):_*), new FeatureVector(ffeats))
           checkFlush(begin, split, end)
           axpy(score, new FeatureVector(lspec.featuresForBinaryRule(begin, split, end, rule, ref)), ruleCountsPerState(split))
         }
       }
 
-      for(i <- 0 until states.length) {
+      states.indices.foreach { i =>
         checkFlush(-1, i, -1) // force a flush
       }
     }
 
     def anchor(w: IndexedSeq[W], cons: ChartConstraints[L]):GrammarAnchoring[L, W] = new ProjectionsGrammarAnchoring[L, L2, W] {
-
 
       override def addConstraints(constraints: ChartConstraints[L]): GrammarAnchoring[L, W] = {
         anchor(w, cons & constraints)
@@ -168,7 +164,7 @@ object TransformModel {
 
       private def tetra(begin: Int, split: Int, end: Int) = {
         (end.toLong * (end + 1) * (end + 2))/6 + ((split + 1) * split / 2 + begin)
-//        (begin, split, end)
+        // (begin, split, end)
       }
 
       def scoreBinaryRule(begin: Int, split: Int, end: Int, rule: Int, ref: Int) = {
@@ -176,11 +172,10 @@ object TransformModel {
         val sfeats = sspec.featuresForSplit(begin, split, end)
           layer.activations(new FeatureVector(sfeats))
         })
-//        if(fs !=  layer.activations(new FeatureVector( sspec.featuresForSplit(begin, split, end)))) {
-//          println("!!!!")
-//        }
+        // if (fs !=  layer.activations(new FeatureVector( sspec.featuresForSplit(begin, split, end)))) {
+        //  println("!!!!")
+        // }
         val rfeats = lspec.featuresForBinaryRule(begin, split, end, rule, ref)
-
         new FeatureVector(rfeats) dot fs
       }
 
@@ -205,11 +200,7 @@ object TransformModel {
     }
   }
 
-
-
-
 }
-
 
 case class TransformModelFactory(@Help(text=
                               """The kind of annotation to do on the refined grammar. Default uses just parent annotation.
@@ -232,8 +223,6 @@ You can also epic.trees.annotations.KMAnnotator to get more or less Klein and Ma
 
   type MyModel = TransformModel[AnnotatedLabel, AnnotatedLabel, String]
 
-
-
   override def make(trainTrees: IndexedSeq[TreeInstance[AnnotatedLabel, String]],
                     topology: RuleTopology[AnnotatedLabel],
                     lexicon: Lexicon[AnnotatedLabel, String],
@@ -255,41 +244,37 @@ You can also epic.trees.annotations.KMAnnotator to get more or less Klein and Ma
     val summedWordCounts: Counter[String, Double] = sum(annWords, Axis._0)
     lazy val ngramF = new NGramSpanFeaturizer(summedWordCounts, NGramSpanFeaturizer.countBigrams(annTrees), annTrees.map(_.words), ngramCountThreshold, maxNGramOrder, useNot = false)
     lazy val tagSpanShape = new TagSpanShapeFeaturizer(TagSpanShapeGenerator.makeBaseLexicon(trainTrees))
-//    lazy val fullShape = new FullWordSpanShapeFeaturizer(summedWordCounts.iterator.filter(_._2 > commonWordThreshold * 10).map(_._1).toSet, numSpanContextWords, useRichSpanContext)
+    // lazy val fullShape = new FullWordSpanShapeFeaturizer(summedWordCounts.iterator.filter(_._2 > commonWordThreshold * 10).map(_._1).toSet, numSpanContextWords, useRichSpanContext)
 
     var wf = posFeaturizer.getOrElse( SpanModelFactory.defaultPOSFeaturizer(annWords))
 
-    if(useMorph)
+    if (useMorph)
       wf += mf
-
 
     var span: SplitSpanFeaturizer[String] = spanFeaturizer.getOrElse(SpanModelFactory.goodFeaturizer(annWords, commonWordThreshold, useShape = false))
 
-    if(useNGrams)
+    if (useNGrams)
       span += ngramF
 
     span += new SingleWordSpanFeaturizer[String](wf)
 
-
     val indexedSurface = IndexedSplitSpanFeaturizer.fromData(span, annTrees, bloomFilter = false)
 
-
     def labelFeaturizer(l: AnnotatedLabel) = Set(l, l.baseAnnotatedLabel).toSeq
-    def ruleFeaturizer(r: Rule[AnnotatedLabel]) = if(useGrammar) Set(r, r.map(_.baseAnnotatedLabel)).toSeq else if(r.isInstanceOf[UnaryRule[AnnotatedLabel]]) Set(r.parent, r.parent.baseAnnotatedLabel).toSeq else Seq.empty
+    def ruleFeaturizer(r: Rule[AnnotatedLabel]) = if (useGrammar) Set(r, r.map(_.baseAnnotatedLabel)).toSeq else if (r.isInstanceOf[UnaryRule[AnnotatedLabel]]) Set(r.parent, r.parent.baseAnnotatedLabel).toSeq else Seq.empty
 
     val featurizer = new ProductionFeaturizer[AnnotatedLabel, AnnotatedLabel, String](xbarGrammar, indexedRefinements,
       lGen=labelFeaturizer,
       rGen=ruleFeaturizer)
 
-
-    new TransformModel(annotator.latent,
+    new TransformModel(
+      annotator.latent,
       constrainer,
       topology, lexicon,
       refGrammar, indexedRefinements,
       featurizer, indexedSurface,
-      new AffineTransform(featurizer.index.size, rank, new AffineTransform(rank, indexedSurface.featureIndex.size, new IdentityTransform[FeatureVector]())))
+      new AffineTransform(featurizer.index.size, rank, new AffineTransform(rank, indexedSurface.featureIndex.size, new IdentityTransform[FeatureVector]()))
+    )
   }
-
-
 
 }

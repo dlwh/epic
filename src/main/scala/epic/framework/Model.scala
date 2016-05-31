@@ -21,7 +21,6 @@ import breeze.linalg._
 import breeze.util.Index
 import epic.util.{SafeLogging, WeightsCache}
 
-
 /**
  * A Model represents a class for turning weight vectors into [[epic.framework.Inference]]s.
  * It's main job is to hook up with a [[epic.framework.ModelObjective]] and mediate
@@ -42,7 +41,6 @@ trait Model[Datum] extends SafeLogging { self =>
 
   def emptyCounts: ExpectedCounts
   def accumulateCounts(inf: Inference, s: Scorer, d: Datum, m: Marginal, accum: ExpectedCounts, scale: Double):Unit
-
 
   final def expectedCounts(inf: Inference, d: Datum, scale: Double = 1.0):ExpectedCounts = {
     val ec = emptyCounts
@@ -82,7 +80,7 @@ trait Model[Datum] extends SafeLogging { self =>
   def readCachedFeatureWeights(suffix:String=""):Option[DenseVector[Double]] = {
     val file = new File(weightsCacheName+suffix+".txt.gz")
     logger.info(s"Reading old weights from $file")
-    if(file.exists)  {
+    if (file.exists)  {
       Some(WeightsCache.read(file, featureIndex))
     } else {
       None

@@ -82,14 +82,14 @@ class SimpleTagScorer[L, W](counts: Counter2[L, W, Double]) extends TagScorer[L,
       var cWord = wordCounts(w)
       var cTagWord = counts(l, w)
       var pTag = labelCounts(l) / totalCount
-      if(pTag == 0.0) {
+      if (pTag == 0.0) {
         pTag = 1.0
       }
       assert(cWord >= cTagWord)
-      if(cWord < 10 || cTagWord == 0.0) {
+      if (cWord < 10 || cTagWord == 0.0) {
         cWord += 1.0
         cTagWord += counts(l, ::).size.toDouble / wordCounts.size
-        if(cTagWord == 0.0) {
+        if (cTagWord == 0.0) {
           cTagWord = 1.0
         }
       }

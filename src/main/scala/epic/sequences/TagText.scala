@@ -10,7 +10,6 @@ import epic.trees.AnnotatedLabel
  */
 object TagText extends ProcessTextMain[CRF[AnnotatedLabel, String], TaggedSequence[AnnotatedLabel, String]] {
 
-
   override def render(model: CRF[AnnotatedLabel, String], ann: TaggedSequence[AnnotatedLabel, String], tokens: IndexedSeq[String]): String = ann.render
 
   override def annotate(model: CRF[AnnotatedLabel, String], text: IndexedSeq[String]): TaggedSequence[AnnotatedLabel, String] = {

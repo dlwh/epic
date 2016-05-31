@@ -45,7 +45,7 @@ class StructuredPerceptron[Datum](model: Model[Datum], maxPasses: Int = 100, bat
           logger.info(f"this instance ${ec.loss}%.2f loss, ${numBad.get}/${batch.size} instances were not right!")
         }
 
-        if(totalCounts.isEmpty)
+        if (totalCounts.isEmpty)
           logger.info(f"this instance everything was fine!")
 
       }

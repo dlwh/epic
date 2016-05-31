@@ -6,8 +6,6 @@ import scala.Array
 import scala.collection.mutable.ArrayBuffer
 import StandardSpanFeatures._
 
-
-
 case class FirstWordCapsAnd(f: Feature) extends Feature
 case class NthWordCapsAnd(f: Feature) extends Feature
 case class SentenceLengthFeature(length: Int) extends Feature
