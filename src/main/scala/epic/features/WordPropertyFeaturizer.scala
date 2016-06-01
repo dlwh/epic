@@ -21,15 +21,24 @@ import epic.framework.Feature
 
 import scala.collection.mutable.ArrayBuffer
 
+@SerialVersionUID(1L)
 final case class IndicatorWSFeature(name: Symbol) extends Feature
+@SerialVersionUID(1L)
 final case class SuffixFeature(str: String) extends Feature
+@SerialVersionUID(1L)
 final case class PrefixFeature(str: String) extends Feature
+@SerialVersionUID(1L)
 final case class ShapeFeature(str: String) extends Feature
+@SerialVersionUID(1L)
 final case class SignatureFeature(str: String) extends Feature
+@SerialVersionUID(1L)
 final case class SeenWithTagFeature(str: Any) extends Feature
+@SerialVersionUID(1L)
 final case class LeftWordFeature(str: Any) extends Feature
+@SerialVersionUID(1L)
 final case class RightWordFeature(str: Any) extends Feature
 
+@SerialVersionUID(1L)
 class WordPropertyFeaturizer(wordCounts: Counter[String, Double],
                              commonWordThreshold: Int = 20) extends WordFeaturizer[String] with Serializable {
   import epic.features.WordPropertyFeaturizer._
@@ -191,4 +200,5 @@ object WordPropertyFeaturizer {
   val endsWithPeriodFeature = IndicatorWSFeature('EndsWithPeriod)
 }
 
+@SerialVersionUID(1L)
 case class DigitNormalizedFeature(w: String) extends Feature

@@ -10,6 +10,7 @@ import scala.collection.immutable
  *
  * @author dlwh
  **/
+@SerialVersionUID(1L)
 class IdentityWordFeaturizer[W](wordCounts: Counter[W, Double], unknownWordThreshold: Int = 2) extends WordFeaturizer[W] with Serializable {
 
   def anchor(words: IndexedSeq[W]):WordFeatureAnchoring[W] = {

@@ -143,6 +143,7 @@ object MentionType {
 /**
  * The NER types used in Ontonotes
  */
+@SerialVersionUID(1L)
 object NerType extends Enumeration {
   def fromString(str: String): NerType.Value = str.toLowerCase match {
     case "cardinal" => Cardinal

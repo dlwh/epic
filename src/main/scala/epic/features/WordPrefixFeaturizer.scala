@@ -20,6 +20,7 @@ import breeze.linalg._
 import collection.mutable.ArrayBuffer
 import breeze.util.{Encoder, Index}
 
+@SerialVersionUID(1L)
 class WordPrefixFeaturizer(wordCounts: Counter[String, Double], prefixOrder: Int = 5, commonWordThreshold: Int = 100) extends WordFeaturizer[String] with Serializable {
 
   private val wordIndex = Index(wordCounts.keysIterator)

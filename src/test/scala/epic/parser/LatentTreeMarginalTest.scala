@@ -2,9 +2,10 @@ package epic.parser
 
 import org.scalatest.FunSuite
 import breeze.util.Implicits._
+import breeze.linalg.norm
 
 /**
- * 
+ *
  * @author dlwh
  */
 class LatentTreeMarginalTest extends FunSuite {
@@ -16,7 +17,7 @@ class LatentTreeMarginalTest extends FunSuite {
       assert(lmarg.logPartition closeTo marg.logPartition, lmarg.logPartition + " " +marg.logPartition)
       val lcounts = lmarg.expectedRuleCounts
       val counts = lmarg.expectedRuleCounts
-      assert((lcounts.counts - counts.counts).norm(2) < 1E-4 * lcounts.length)
+      assert(norm(lcounts.counts - counts.counts, 2) < 1E-4 * lcounts.length)
     }
 
   }
