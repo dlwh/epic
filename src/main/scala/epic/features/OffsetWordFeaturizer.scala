@@ -3,6 +3,7 @@ package epic.features
 import epic.framework.Feature
 import scala.collection.mutable.ArrayBuffer
 
+@SerialVersionUID(1L)
 case class OffsetFeature(offset: Int, feature: Feature) extends Feature
 
 /**

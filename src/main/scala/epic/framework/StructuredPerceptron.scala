@@ -52,7 +52,7 @@ class StructuredPerceptron[Datum](model: Model[Datum], maxPasses: Int = 100, bat
 
       logger.info(f"this pass $lossThisPass%.2f loss, $numTotalBad/$numTotal instances were not right!")
 
-      converged = (weights - averageWeights).norm(Double.PositiveInfinity) < 1E-4
+      converged = norm(weights - averageWeights, Double.PositiveInfinity) < 1E-4
 
       averageWeights *= (i/(i+1).toDouble)
       axpy(1/(i+1).toDouble, weights, averageWeights)
