@@ -77,7 +77,7 @@ object ExpectationPropagation extends App {
     }
 
     def isConvergedTo(f: ApproxTerm, diff: Double) = {
-      (b - f.b).norm(2) <= diff
+      norm(b - f.b, 2.0) <= diff
     }
   }
 
