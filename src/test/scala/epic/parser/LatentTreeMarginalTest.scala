@@ -3,9 +3,10 @@ package epic.parser
 import breeze.linalg.norm
 import org.scalatest.FunSuite
 import breeze.util.Implicits._
+import breeze.linalg.norm
 
 /**
- * 
+ *
  * @author dlwh
  */
 class LatentTreeMarginalTest extends FunSuite {

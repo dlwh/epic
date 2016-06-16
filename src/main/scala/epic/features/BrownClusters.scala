@@ -38,8 +38,10 @@ object BrownClusters {
   }
 }
 
-case class BrownClusterFeature(f: String) extends Feature
+@SerialVersionUID(1L)
+case class BrownClusterFeature(f: String) extends Feature with Serializable
 
+@SerialVersionUID(1L)
 case class BrownClusterFeaturizer(lengths: Array[Int]) extends WordFeaturizer[String] with Serializable {
 
   def anchor(w: IndexedSeq[String]): WordFeatureAnchoring[String] = new WordFeatureAnchoring[String] {
@@ -58,7 +60,8 @@ case class BrownClusterFeaturizer(lengths: Array[Int]) extends WordFeaturizer[St
     }
   }
 
-  case object UnknownWordFeature extends Feature
+  @SerialVersionUID(1L)
+  case object UnknownWordFeature extends Feature with Serializable
 
   // prefixes of lengths prefixBegin to prefixEnd
   private val clusterFeatures = {

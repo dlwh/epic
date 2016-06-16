@@ -11,6 +11,7 @@ import scala.collection.immutable
  *
  * @author dlwh
  */
+@SerialVersionUID(1L)
 class SegmentedIndex[T,IndexType](val indices: IndexedSeq[IndexType])(implicit view: IndexType <:< Index[T]) extends Index[Feature] {
   def apply(t: Feature): Int = t match {
     case ComponentFeature(i, f) if i < indices.length && i >= 0 => indices(i)(f.asInstanceOf[T])

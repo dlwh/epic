@@ -17,4 +17,5 @@ class SpanLengthFeaturizer(db: DistanceBinner = new DistanceBinner()) extends Su
     }
   }
 }
+@SerialVersionUID(1L)
 case class SpanLengthFeature(dist: Int) extends Feature

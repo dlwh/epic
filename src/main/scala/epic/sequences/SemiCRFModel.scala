@@ -265,8 +265,8 @@ class SegmentationModelFactory[L](wordFeaturizer: Optional[WordFeaturizer[String
   }
 
 }
-
-object SegmentationModelFactory {
+@SerialVersionUID(1L)
+object SegmentationModelFactory extends Serializable {
 
   def goodNERFeaturizers[L](counts: Counter2[L, String, Double]) = {
     val dsl = new WordFeaturizer.DSL[L](counts) with SurfaceFeaturizer.DSL with BrownClusters.DSL
@@ -291,10 +291,14 @@ object SegmentationModelFactory {
   }
 
 
+  @SerialVersionUID(1L)
   case class Label1Feature[L](label: L, kind: Any) extends Feature
+  @SerialVersionUID(1L)
   case class TransitionFeature[L](label: L, label2: L) extends Feature
+  @SerialVersionUID(1L)
   case object OutsideFeature extends Feature
 
+  @SerialVersionUID(1L)
   object FeatureKinds extends Enumeration {
     val Begin, Interior, Span, Label = Value
   }

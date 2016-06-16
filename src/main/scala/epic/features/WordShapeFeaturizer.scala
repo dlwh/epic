@@ -9,6 +9,7 @@ import breeze.util.{Encoder, Interner, Index}
  *
  * @author dlwh
  **/
+@SerialVersionUID(1L)
 class WordShapeFeaturizer(wordCounts: Counter[String, Double],
                           functionWordThreshold: Int = 100) extends WordFeaturizer[String] with Serializable {
 
