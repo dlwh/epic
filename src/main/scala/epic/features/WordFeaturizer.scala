@@ -34,10 +34,9 @@ object WordFeaturizer {
 
     (
       unigrams(word + clss, 1)
-        + bigrams(clss, 2)
         + bigrams(tagDict, 2)
-        + suffixes()
-        + prefixes()
+        + suffixes(4)
+        + prefixes(4)
         + props
       )
   }
@@ -45,9 +44,7 @@ object WordFeaturizer {
   def goodPOSTagTransitionFeaturizer[L](counts: Counter2[L, String, Double]) = {
     val dsl = new WordFeaturizer.DSL[L](counts)
     import dsl._
-
-    word + clss
-
+    clss
   }
 
   def apply[W](f: W=>Array[Feature]) = new TabulatedWordFeaturizer(f)

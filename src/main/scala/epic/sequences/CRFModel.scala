@@ -3,12 +3,13 @@ package epic.sequences
 import epic.framework._
 import breeze.util._
 import breeze.linalg._
-import epic.sequences.CRF.{AnchoredFeaturizer, TransitionVisitor}
+import epic.sequences.CRF.{ AnchoredFeaturizer, TransitionVisitor }
 import breeze.features.FeatureVector
 import epic.features._
-import epic.lexicon.SimpleLexicon
+import epic.lexicon.{ SignatureLexicon, SimpleLexicon }
 import java.util
-import epic.util.{ProgressLog, SafeLogging, Optional}
+
+import epic.util.{ Optional, ProgressLog, SafeLogging }
 import epic.constraints.TagConstraints
 
 /**
@@ -135,7 +136,7 @@ class TaggedSequenceModelFactory[L](val startSymbol: L,
     val labelIndex: Index[L] = Index[L](Iterator(startSymbol) ++ train.iterator.flatMap(_.label))
     val counts: Counter2[L, String, Double] = Counter2.count(train.flatMap(p => p.label zip p.words)).mapValues(_.toDouble)
 
-    val lexicon:TagConstraints.Factory[L, String] = new SimpleLexicon[L, String](labelIndex, counts)
+    val lexicon: TagConstraints.Factory[L, String] = SignatureLexicon.fromCounts[L, String](labelIndex, counts)
 
     var featurizer: WordFeaturizer[String] = wordFeaturizer.getOrElse(WordFeaturizer.goodPOSTagFeaturizer(counts))
     featurizer = gazetteer.foldLeft(featurizer)(_ + _)
@@ -151,7 +152,7 @@ class TaggedSequenceModelFactory[L](val startSymbol: L,
     }
     val l2Builder = new CrossProductIndex.Builder(label2Index, indexedL2featurizer.featureIndex, includeLabelOnlyFeatures = true, hashFeatures = HashFeature.Relative(hashFeatureScale))
 
-    val progress = new ProgressLog(logger,train.length, frequency=1000, name= "NumFeatures")
+    val progress = new ProgressLog(logger, train.length, frequency=1000, name = "NumFeatures")
     for(s <- train) {
       val loc = indexedFeaturizer.anchor(s.words)
       val l2loc = indexedL2featurizer.anchor(s.words)
@@ -161,8 +162,8 @@ class TaggedSequenceModelFactory[L](val startSymbol: L,
         b <- 0 until s.length
         l <- lexLoc.allowedTags(b)
       } {
-        lfBuilder.add(l, loc.featuresForWord(b))
         if (lexLoc.allowedTags(b).size > 1) {
+          lfBuilder.add(l, loc.featuresForWord(b))
           for(prevTag <- if (b == 0) Set(labelIndex(startSymbol)) else lexLoc.allowedTags(b-1)) {
             l2Builder.add(label2Features(prevTag)(l), l2loc.featuresForWord(b))
           }
