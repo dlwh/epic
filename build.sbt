@@ -22,9 +22,24 @@ lazy val extra = <url>http://scalanlp.org/</url>
     </developer>
   </developers>;
 
+// git.useGitDescribe := true
+
+val VersionRegex = "v([0-9]+.[0-9]+.[0-9]+)-?(.*)?".r
+
+
 lazy val commonSettings = Seq(
   organization := "org.scalanlp",
-  version := "0.4-SNAPSHOT",
+
+  git.baseVersion := "0.4",
+  git.gitTagToVersionNumber := { v: String =>
+    v match {
+      case VersionRegex(v,"") => Some(v)
+      case VersionRegex(v,"SNAPSHOT") => Some(s"$v-SNAPSHOT")
+      case VersionRegex(v,s) => Some(s"$v-$s-SNAPSHOT")
+      case _ => None
+    }
+  },
+
   scalaVersion := Version.scala,
   crossScalaVersions := Seq("2.11.7", "2.10.4"),
   libraryDependencies ++= Seq(
@@ -91,6 +106,7 @@ lazy val commonSettings = Seq(
 
 lazy val epicCore = project
   .in(file("."))
+  .enablePlugins(GitVersioning)
   .settings(commonSettings: _*)
   .settings(
     name := "epic"

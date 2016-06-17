@@ -16,3 +16,5 @@ addSbtPlugin("com.github.mpeltonen" % "sbt-idea" % "1.6.0")
 addSbtPlugin("net.virtual-void" % "sbt-dependency-graph" % "0.7.5")
 
 addSbtPlugin("com.typesafe.sbt" % "sbt-osgi" % "0.7.0")
+
+addSbtPlugin("com.typesafe.sbt" % "sbt-git" % "0.8.5")
