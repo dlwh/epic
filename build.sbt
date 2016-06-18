@@ -31,6 +31,8 @@ lazy val commonSettings = Seq(
   organization := "org.scalanlp",
 
   git.baseVersion := "0.4",
+  // append -SNAPSHOT unless we're on a branch
+  git.gitUncommittedChanges := git.gitCurrentTags.value.isEmpty,
   git.gitTagToVersionNumber := { v: String =>
     v match {
       case VersionRegex(v,"") => Some(v)
@@ -69,13 +71,6 @@ lazy val commonSettings = Seq(
       Some("snapshots" at nexus + "content/repositories/snapshots")
     else
       Some("releases" at nexus + "service/local/staging/deploy/maven2")
-  },
-  version <<= (isSnapshot, version) { (snap, v) =>
-    if (snap && !v.endsWith("-SNAPSHOT")) {
-      v + "-SNAPSHOT"
-    } else {
-      v
-    }
   },
   publishArtifact in Test := false,
   pomIncludeRepository := { _ => false },
