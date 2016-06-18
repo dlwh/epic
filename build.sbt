@@ -63,9 +63,9 @@ lazy val commonSettings = Seq(
   fork := true,
   publishMavenStyle := true,
   pomExtra := extra,
-  publishTo <<= version { (v: String) =>
+  publishTo <<= isSnapshot { (v: Boolean) =>
     val nexus = "https://oss.sonatype.org/"
-    if (v.trim.endsWith("SNAPSHOT"))
+    if (v)
       Some("snapshots" at nexus + "content/repositories/snapshots")
     else
       Some("releases" at nexus + "service/local/staging/deploy/maven2")
