@@ -70,6 +70,13 @@ lazy val commonSettings = Seq(
     else
       Some("releases" at nexus + "service/local/staging/deploy/maven2")
   },
+  version <<= (isSnapshot, version) { (snap, v) =>
+    if (snap && !v.endsWith("-SNAPSHOT")) {
+      v + "-SNAPSHOT"
+    } else {
+      v
+    }
+  },
   publishArtifact in Test := false,
   pomIncludeRepository := { _ => false },
   assemblyOption in assembly ~= {
