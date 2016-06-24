@@ -335,11 +335,11 @@ d{Q} / ye                                                        {return current
 <YYINITIAL>\"/{WHITESPACE}*{ALPHANUM}              { yybegin(OPEN_QUOTE); return currentToken("``"); }
 <YYINITIAL>'/{WHITESPACE}*{ALPHANUM}               { yybegin(OPEN_QUOTE); return currentToken("`"); }
 ‘                                                  { yybegin(OPEN_QUOTE); return currentToken("`"); }
-’                                                  { yybegin(YYINITIAL); return currentToken("'"); }
-<OPEN_QUOTE>\"                                                 { yybegin(YYINITIAL); return currentToken("''"); }
-“                                                 { yybegin(YYINITIAL); return currentToken("``"); }
+’                                                 { yybegin(YYINITIAL); return currentToken("'"); }
+<OPEN_QUOTE>\"                                    { yybegin(YYINITIAL); return currentToken("''"); }
+“                                                 { yybegin(OPEN_QUOTE); return currentToken("``"); }
 ”                                                 { yybegin(YYINITIAL); return currentToken("''"); }
-\"/.*{ALPHANUM}+                                  { yybegin(OPEN_QUOTE); return currentToken("``"); }
+\"/{ALPHANUM}+                                  { yybegin(OPEN_QUOTE); return currentToken("``"); }
 \"                                                { yybegin(YYINITIAL); return currentToken("''"); }
 
 
