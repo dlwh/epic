@@ -184,6 +184,11 @@ class TreebankTokenizerTest  extends FunSuite {
     assert(TreebankTokenizer("Hello \"World\" there") == Seq("Hello", "``", "World", "''", "there"))
   }
 
+  test("words with single quotes in the middle") {
+    assert(isOneToken("Xi'an"))
+    assert(isOneToken("donets'k"))
+  }
+
 
   // test examples from https://github.com/brendano/ark-tweet-nlp/blob/master/examples/example_tweets.txt
   // Code is Apache License 2.0.0

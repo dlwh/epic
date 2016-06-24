@@ -335,9 +335,9 @@ d{Q} / ye                                                        {return current
 <YYINITIAL>\"/{WHITESPACE}*{ALPHANUM}              { yybegin(OPEN_QUOTE); return currentToken("``"); }
 <YYINITIAL>'/{WHITESPACE}*{ALPHANUM}               { yybegin(OPEN_QUOTE); return currentToken("`"); }
 ‘                                                  { yybegin(OPEN_QUOTE); return currentToken("`"); }
-’                                                 { yybegin(YYINITIAL); return currentToken("'"); }
-<OPEN_QUOTE>\"                                    { yybegin(YYINITIAL); return currentToken("''"); }
-“                                                 { yybegin(OPEN_QUOTE); return currentToken("``"); }
+’                                                  { yybegin(YYINITIAL); return currentToken("'"); }
+<OPEN_QUOTE>\"                                     { yybegin(YYINITIAL); return currentToken("''"); }
+“                                                 { yybegin(YYINITIAL); return currentToken("``"); }
 ”                                                 { yybegin(YYINITIAL); return currentToken("''"); }
 \"/{ALPHANUM}+                                  { yybegin(OPEN_QUOTE); return currentToken("``"); }
 \"                                                { yybegin(YYINITIAL); return currentToken("''"); }
@@ -351,6 +351,7 @@ d{Q} / ye                                                        {return current
 {TWITTER_HANDLE}                                                     { return currentToken(); }
 {TWITTER_HASHTAG}                                                     { return currentToken(); }
 {WORD}                                        {return currentToken();}
+{WORD}{Q}{WORD}                                        {return currentToken();}
 {ABBRNYM}                                                      { return currentToken(); }
 {COMPANY}                                                      { return currentToken(); }
 {EMAIL}                                                        { return currentToken(); }
