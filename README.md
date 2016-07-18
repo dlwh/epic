@@ -18,9 +18,9 @@ See some example usages at <https://github.com/dlwh/epic-demo>.
 
 Epic can be used programmatically or from the command line, using
 either pretrained models ([see below](#pre-trained-models)) or with
-models you have trained yourself. Currently,
+models you have trained yourself. 
 
-Epic has support for three kinds of models: parsers, sequence
+Currently, Epic has support for three kinds of models: parsers, sequence
 labelers, and segmenters. Parsers produce syntactic representations
 of sentences. Sequence labelers are things like part-of-speech
 taggers. These associate each word in a sentence with a label. For
