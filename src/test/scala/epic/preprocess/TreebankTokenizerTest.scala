@@ -2,6 +2,9 @@ package epic.preprocess
 
 import org.scalatest.FunSuite
 
+import scala.collection.mutable.ArrayBuffer
+import scala.io.{ Codec, Source }
+
 class TreebankTokenizerTest  extends FunSuite {
 
   private def isOneToken(w: String) =
@@ -408,8 +411,24 @@ class TreebankTokenizerTest  extends FunSuite {
 
   test("Gettysburg address") {
     val text = """But, in a larger sense, we can not dedicate -- we can not consecrate -- we can not hallow -- this ground."""
-    val words = TreebankTokenizer(text).toSeq
+    val words = TreebankTokenizer(text)
     assert(words.length === 25, words)
     assert(words.startsWith(Seq("But", ",", "in", "a", "larger", "sense", ",", "we", "can", "not", "dedicate", "--")), words)
   }
+
+  test("don't split abbreviations in the middle of a string") {
+    val failures = ArrayBuffer[String]()
+    for (line <- Source.fromInputStream(getClass.getResourceAsStream("abbrs.txt"))(Codec.UTF8).getLines()) {
+      if (TreebankTokenizer(line.trim + " test").length != 2) {
+        failures += line.trim()
+      }
+    }
+
+    assert(failures.isEmpty, s"${failures.length} failures. First K: ${failures.take(10)}")
+  }
+
+  test("split medial periods in general") {
+    assert(TreebankTokenizer("no. i. do. want. a. puppy. c.").length == 12)
+  }
+
 }

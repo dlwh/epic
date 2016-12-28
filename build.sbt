@@ -32,7 +32,8 @@ lazy val commonSettings = Seq(
 
   git.baseVersion := "0.4",
   // append -SNAPSHOT unless we're on a branch
-  git.gitUncommittedChanges := git.gitCurrentTags.value.isEmpty,
+  git.gitUncommittedChanges := false,//git.gitCurrentTags.value.isEmpty,
+  isSnapshot := false,
   git.gitTagToVersionNumber := { v: String =>
     v match {
       case VersionRegex(v,"") => Some(v)
@@ -60,7 +61,7 @@ lazy val commonSettings = Seq(
     Library.junit % "test"
   ),
   scalacOptions ++= Seq("-deprecation", "-language:_", "-optimize"),
-  javaOptions += "-Xmx4g",
+  javaOptions += "-Xmx6g",
   javaOptions += "-Xrunhprof:cpu=samples,depth=12",
   fork := true,
   publishMavenStyle := true,

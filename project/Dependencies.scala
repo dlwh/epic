@@ -3,7 +3,7 @@ import sbt._
 object Version {
   val scala               = "2.11.8"
   val scalaTest           = "2.2.5"
-  val breeze              = "0.13-e4862ccf177d7f706e201b2d953997970d173fd4-SNAPSHOT"
+  val breeze              = "0.13-d8f39f658cbc49f81c7a4f0c27e048af916262a7"
   val breezeConfig        = "0.9.1"
   val mapdb               = "0.9.2"
   val scalaLogging        = "2.1.2"
