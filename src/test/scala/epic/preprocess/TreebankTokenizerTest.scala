@@ -429,6 +429,7 @@ class TreebankTokenizerTest  extends FunSuite {
 
   test("split medial periods in general") {
     assert(TreebankTokenizer("no. i. do. want. a. puppy. c.").length == 12)
+    assert(TreebankTokenizer("too expensive. do you have anything cheaper?").length == 9)
   }
 
 }
