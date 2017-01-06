@@ -362,7 +362,9 @@ object MLSentenceSegmenter {
 
   val extraExamples = IndexedSeq (
     instancesAtPeriods("Hello to you.Let's go outside."),
-    instancesAtPeriods("Among the items up for sale: the Singer sewing machine the embattled domestic diva used to sew her own wedding dress back in 1961. He also hocked the double boiler.")
+    instancesAtPeriods("Among the items up for sale: the Singer sewing machine the embattled domestic diva used to sew her own wedding dress back in 1961. He also hocked the double boiler."),
+    instancesAtPeriods("too expensive. do you have anything cheaper."),
+    instancesAtPeriods("i'm planning a trip to san diego. flying from chicago on 1/3 returning 1/7.")
   )
 
   def main(args: Array[String]):Unit = {
@@ -462,7 +464,7 @@ object MLSentenceSegmenter {
         val weights = inst.features.toIndexedSeq.map(f => f -> decoded(f))
         val sum: Double = weights.map(_._2).sum
         println("===========")
-        println(inst.label, inst.id, sum)
+        println(s"label: ${inst.label} id: ${inst.id} score: ${sum}")
         println(inst.context)
         println(weights.sortBy(-_._2.abs).scanLeft(null: Any, 0.0, 0.0){ (acc, z) => (z._1, z._2, z._2 + acc._2)}.drop(1), sum)
         wrong += 1
