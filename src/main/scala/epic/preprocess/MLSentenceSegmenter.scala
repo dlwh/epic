@@ -7,14 +7,15 @@ import breeze.features.FeatureVector
 import breeze.linalg._
 import breeze.numerics._
 import breeze.optimize.L2Regularization
-import breeze.stats.distributions.{RandBasis, Rand}
-import breeze.util.{Encoder, Index, Iterators}
+import breeze.stats.distributions.{ Rand, RandBasis }
+import breeze.util.{ Encoder, Index, Iterators }
 import epic.corpora.MascSlab
 import epic.features.CrossProductFeature
-import epic.framework.{Example, Feature, ModelObjective, StandardExpectedCounts}
-import epic.slab.{Sentence, StringSlab}
+import epic.framework.{ Example, Feature, ModelObjective, StandardExpectedCounts }
+import epic.slab.{ Sentence, StringSlab }
 import epic.trees.Span
 
+import scala.collection.SortedSet
 import scala.collection.mutable.ArrayBuffer
 import scala.io.Source
 
@@ -129,86 +130,84 @@ object MLSentenceSegmenter {
   }
 
   def featuresForEndPointDetection(text: String, offset: Int):Array[Feature] = {
+    val buf = new ArrayBuffer[Feature]
+    buf += BiasFeature
+    // val break = BreakIterator.getSentenceInstance
+    // break.setText(text)
+    // val pos = break.following(math.max(offset -  3, 0))
+    // buf += JavaDistFeature(math.min(pos - offset, 5))
     if (offset == text.length) {
-      Array(BiasFeature, EOFFeature)
-    } else {
-      val buf = new ArrayBuffer[Feature]
-      // val break = BreakIterator.getSentenceInstance
-      // break.setText(text)
-      // val pos = break.following(math.max(offset -  3, 0))
-      // buf += JavaDistFeature(math.min(pos - offset, 5))
-      buf += BiasFeature
-      // baseline features for the current char
-      val curCharFeatures: IndexedSeq[Feature] = addCharFeatures(text, offset, 0)
-      buf ++= curCharFeatures
+      buf += EOFFeature
+    }
+    // baseline features for the current char
+    val curCharFeatures: IndexedSeq[Feature] = addCharFeatures(text, offset, 0)
+    buf ++= curCharFeatures
 
-      if (previousLineIsShort(text, offset)) {
-        buf += LineIsShortFeature
-        for(m <- curCharFeatures) {
-          buf += CrossProductFeature(LineIsShortFeature, m)
-        }
+    if (previousLineIsShort(text, offset)) {
+      buf += LineIsShortFeature
+      for(m <- curCharFeatures) {
+        buf += CrossProductFeature(LineIsShortFeature, m)
       }
-
-      buf ++= addCharFeatures(text, offset, -2)
-      buf ++= addCharFeatures(text, offset, -1)
-      buf ++= addCharFeatures(text, offset, 1)
-      buf ++= addCharFeatures(text, offset, 2)
-      for(f1 <- addCharFeatures(text, offset, 1); f2 <- addCharFeatures(text, offset, 2)) {
-        buf += CrossProductFeature(f1, f2)
-      }
-
-      for(f1 <- curCharFeatures; f2 <- addCharFeatures(text, offset, 1)) {
-        buf += CrossProductFeature(f1, f2)
-      }
-
-      for(f1 <- addCharFeatures(text, offset, -1); f2 <- curCharFeatures.take(1)) {
-        buf += CrossProductFeature(f1, f2)
-      }
-
-      for(f1 <- addCharFeatures(text, offset, -1); f2 <- addCharFeatures(text, offset, 1)) {
-        buf += CrossProductFeature(f1, f2)
-      }
-
-      for(f1 <- addCharFeatures(text, offset, -1); fmid <- curCharFeatures.take(1); f2 <- addCharFeatures(text, offset, 1)) {
-        buf += CrossProductFeature(f1, CrossProductFeature(fmid, f2))
-      }
-
-      for(f1 <- addCharFeatures(text, offset, -1); f2 <- addCharFeatures(text, offset, 2)) {
-        buf += CrossProductFeature(f1, f2)
-      }
-
-      val prevSpace = math.max(text.lastIndexWhere(!_.isLetterOrDigit, offset - 2), -1) // -1 is ok, assume BOS is space
-      buf += ContextWord(text.substring(prevSpace + 1, offset))
-      buf += LastWordLength(offset - prevSpace)
-      val nextNotSpace = text.indexWhere(c => !c.isSpaceChar && !c.isControl, offset + 1)
-      if (nextNotSpace >= 0) {
-        val nextWordEnd = if (text.charAt(nextNotSpace).isLetterOrDigit){
-          text.indexWhere(c => !c.isLetterOrDigit, nextNotSpace + 1)
-        } else {
-          text.indexWhere(c => Character.getType(c) != text.charAt(nextNotSpace), nextNotSpace + 1)
-        }
-        buf += ContextWord(text.substring(prevSpace + 1, prevSpace + 2)+"--" + text.substring(nextNotSpace, nextNotSpace + 1), -3)
-        // if (nextWordEnd >= 0) {
-        //   buf += ContextWord(text.substring(nextNotSpace, nextWordEnd), 1)
-        // }
-      }
-
-      val nextLetterPos = text.indexWhere(_.isLetterOrDigit, offset + 1)
-      if (nextLetterPos >= 0) {
-        buf += NextRealLetterFeature(Character.getType(text.charAt(nextLetterPos)))
-      }
-
-      buf += SurroundingCharFeature(if (offset == 0) "BOS" else codepointToString(text.codePointBefore(offset)),
-                                    if (nextNotSpace < 0) "EOS" else codepointToString(text.codePointAt(nextNotSpace)))
-
-      buf += SurroundingCharTypeFeature(if (offset == 0) -1 else Character.getType(text.codePointBefore(offset)),
-        if (nextNotSpace < 0) -1 else Character.getType(text.codePointAt(nextNotSpace)))
-
-      buf += CrossProductFeature(buf(1), buf.last)
-
-      buf.toArray
     }
 
+    buf ++= addCharFeatures(text, offset, -2)
+    buf ++= addCharFeatures(text, offset, -1)
+    buf ++= addCharFeatures(text, offset, 1)
+    buf ++= addCharFeatures(text, offset, 2)
+    for(f1 <- addCharFeatures(text, offset, 1); f2 <- addCharFeatures(text, offset, 2)) {
+      buf += CrossProductFeature(f1, f2)
+    }
+
+    for(f1 <- curCharFeatures; f2 <- addCharFeatures(text, offset, 1)) {
+      buf += CrossProductFeature(f1, f2)
+    }
+
+    for(f1 <- addCharFeatures(text, offset, -1); f2 <- curCharFeatures.take(1)) {
+      buf += CrossProductFeature(f1, f2)
+    }
+
+    for(f1 <- addCharFeatures(text, offset, -1); f2 <- addCharFeatures(text, offset, 1)) {
+      buf += CrossProductFeature(f1, f2)
+    }
+
+    for(f1 <- addCharFeatures(text, offset, -1); fmid <- curCharFeatures.take(1); f2 <- addCharFeatures(text, offset, 1)) {
+      buf += CrossProductFeature(f1, CrossProductFeature(fmid, f2))
+    }
+
+    for(f1 <- addCharFeatures(text, offset, -1); f2 <- addCharFeatures(text, offset, 2)) {
+      buf += CrossProductFeature(f1, f2)
+    }
+
+    val prevSpace = math.max(text.lastIndexWhere(!_.isLetterOrDigit, offset - 2), -1) // -1 is ok, assume BOS is space
+    buf += ContextWord(text.substring(prevSpace + 1, offset))
+    buf += LastWordLength(offset - prevSpace)
+    val nextNotSpace = text.indexWhere(c => !c.isSpaceChar && !c.isControl, offset + 1)
+    if (nextNotSpace >= 0) {
+      val nextWordEnd = if (text.charAt(nextNotSpace).isLetterOrDigit){
+        text.indexWhere(c => !c.isLetterOrDigit, nextNotSpace + 1)
+      } else {
+        text.indexWhere(c => Character.getType(c) != text.charAt(nextNotSpace), nextNotSpace + 1)
+      }
+      buf += ContextWord(text.substring(prevSpace + 1, prevSpace + 2)+"--" + text.substring(nextNotSpace, nextNotSpace + 1), -3)
+      // if (nextWordEnd >= 0) {
+      //   buf += ContextWord(text.substring(nextNotSpace, nextWordEnd), 1)
+      // }
+    }
+
+    val nextLetterPos = text.indexWhere(_.isLetterOrDigit, offset + 1)
+    if (nextLetterPos >= 0) {
+      buf += NextRealLetterFeature(Character.getType(text.charAt(nextLetterPos)))
+    }
+
+    buf += SurroundingCharFeature(if (offset == 0) "BOS" else codepointToString(text.codePointBefore(offset)),
+      if (nextNotSpace < 0) "EOS" else codepointToString(text.codePointAt(nextNotSpace)))
+
+    buf += SurroundingCharTypeFeature(if (offset == 0) -1 else Character.getType(text.codePointBefore(offset)),
+      if (nextNotSpace < 0) -1 else Character.getType(text.codePointAt(nextNotSpace)))
+
+    buf += CrossProductFeature(buf(1), buf.last)
+
+    buf.toArray
   }
 
   def addCharFeatures(text: String, base: Int, rel: Int): IndexedSeq[Feature] = {
@@ -279,23 +278,31 @@ object MLSentenceSegmenter {
     codepoint != quote || offset >= text.length - 1 || offset == 0 || !Character.isLetterOrDigit(text.codePointAt(offset + 1)) || !Character.isLetterOrDigit(text.codePointBefore(offset))
   }
 
-  def potentialSentenceBoundariesIterator(text: String):Iterator[Int] = new Iterator[Int] {
+  def potentialSentenceBoundariesIterator(text: String):Iterator[Int] = {
     var offset = 0
+    Iterators.fromProducer {
+      if (offset == text.length && text.nonEmpty) {
+        None
+      } else {
+        val next = nextPotentialSentenceBoundary(text, offset)
+        // don't generate EOF boundary if previous character was possibly a sentence boundary
+        if (next < text.length || next != offset + 1) {
+          offset = next
+          Some(next)
+        } else {
+          None
+        }
+      }
 
-    override def hasNext: Boolean = offset < text.length
 
-    override def next(): Int = {
-      offset = nextPotentialSentenceBoundary(text, offset)
-      offset
     }
-
   }
 
-  def adjustGoldSentenceBoundaries(text: String, _endPoints: Iterator[Span]):Set[Int] = {
-    // sort so that longer spans come first, to deal with nesting. (We don't want nested sentences)
-    val endPoints = _endPoints.toIndexedSeq.sortBy(s => (s.begin, -s.length))
+  def adjustGoldSentenceBoundaries(text: String, _endPoints: Iterator[Span], newlineIsBoundary: Boolean):Set[Int] = {
+    // sort so that longer spans are last, to deal with nesting.
+    val endPoints = _endPoints.toIndexedSeq.sortBy(s => (s.begin, s.length))
     var lastSpan = Span(0, 0)
-    val mapped = for(s@Span(begin, _p) <- endPoints if !lastSpan.crosses(s) && !lastSpan.contains(s)) yield {
+    val mapped = for(s@Span(begin, _p) <- endPoints if !lastSpan.crosses(s) && !lastSpan.contains(s) && !s.contains(lastSpan)) yield {
       var p = math.max(_p, 0)
       var cp = text.codePointAt(p)
 
@@ -308,12 +315,13 @@ object MLSentenceSegmenter {
       val nextNonSpacePos = text.indexWhere(!_.isSpaceChar, p)
       if (nextNonSpacePos > p) {
         val ccp = text.charAt(nextNonSpacePos)
-        if (ccp == '\n' || ccp == '\t' || ccp == '\r') {
+        if (isControlChar(ccp)) {
           earliestControlChar = nextNonSpacePos
         }
       }
 
-      while (p > 0 && (Character.isSpaceChar(cp) || cp == '\n' || cp == '\t' || cp == '\r')) {
+      // rewind to the first possible newline or space we can use.
+      while (p > 0 && (Character.isSpaceChar(cp) || isControl(cp))) {
         if (!Character.isSpaceChar(cp)) {
           earliestControlChar = p
         }
@@ -344,8 +352,38 @@ object MLSentenceSegmenter {
       p
     }
 
-    mapped.toSet
+    val annotated = mapped.toSet
+    var allBoundaries = annotated
 
+    if (newlineIsBoundary) {
+      val codepoints = text.codePoints().toArray.zipWithIndex
+      for ((cp, pos) <- codepoints) {
+        if (cp == '\n' && !annotated(pos)) {
+          // if there's a sentence boundary somewhere in the span of spaces containing this
+          // newline, don't add this as a boundary
+          val previousBoundary = codepoints.lastIndexWhere({
+              case (otherCp, otherPos) => (!Character.isSpaceChar(otherCp) && !isControl(otherCp)) || allBoundaries(otherPos)
+          }, pos)
+          val nextBoundary = codepoints.indexWhere({
+            case (otherCp, otherPos) => (!Character.isSpaceChar(otherCp) && !isControl(otherCp)) || allBoundaries(otherPos)
+          }, pos)
+          if (previousBoundary != -1 && !allBoundaries(previousBoundary) && nextBoundary != -1 && !allBoundaries(nextBoundary)) {
+            allBoundaries += pos
+          }
+        }
+      }
+    }
+
+    if (newlineIsBoundary) {
+      println((allBoundaries -- annotated).toIndexedSeq.sorted)
+    }
+
+    allBoundaries
+
+  }
+
+  private def isControlChar(ccp: Char): Boolean = {
+    ccp == '\n' || ccp == '\t' || ccp == '\r'
   }
 
   case class SentenceDecisionInstance(label: Boolean,
@@ -371,33 +409,47 @@ object MLSentenceSegmenter {
     val mascDir = new File(args(0))
 
     var sentenceBoundaryProblems = for(dir <- new File(new File(mascDir,"data"), "written").listFiles()
-        if !dir.toString.contains("twitter") && dir.isDirectory;
+        if dir.isDirectory;
         f <- dir.listFiles(new FilenameFilter {
       override def accept(dir: File, name: String): Boolean = name.endsWith(".txt")
     })) yield {
       val slab = MascSlab(f.toURI.toURL)
       val slabWithSentences = MascSlab.s(slab)
+      val text = slab.content
 
       val guessPoints: IndexedSeq[Int] = potentialSentenceBoundariesIterator(slabWithSentences.content).toIndexedSeq
 
-      val text = slab.content
-      val goldPoints = adjustGoldSentenceBoundaries(text, slabWithSentences.iterator[Sentence].map(_._1))
+      // twitter data is useful because of lots of caseless stuff, but they have one
+      // tweet per line. line endings don't usually get annotated as sentence boundaries,
+      // and the context from previous/next lines isn't actually real, so we need to fix that.
+      val newlineIsDocBoundary = dir.getName == "twitter"
 
-      // println("<<<<" + f  )
-      // printOutSentenceBoundaries(text, guessPoints.toSet, goldPoints)
+      val goldPoints: Set[Int] = adjustGoldSentenceBoundaries(text, slabWithSentences.iterator[Sentence].map(_._1), newlineIsDocBoundary)
 
       for(guess <- guessPoints) yield {
-        val contextBegin = math.max(0, guess - 50)
-        val contextEnd = math.min(text.length, guess + 50)
-        val context =   if (guess != text.length) {
-          text.substring(contextBegin, guess) + "[[" + text.charAt(guess) + "]]" +  text.substring(guess + 1, contextEnd)
-        } else {
-          text.substring(contextBegin, guess) + "[[]]"
+        val (textForFeatures, guessForFeatures) = {
+          if (newlineIsDocBoundary && guess > 0) {
+            var mostRecentNewline = text.lastIndexWhere(_ == '\n', guess- 1)
+            if (mostRecentNewline < 0) {
+              mostRecentNewline = 0
+            }
+            var nextNewline = text.indexWhere(_ == '\n', guess)
+            if (nextNewline < 0) {
+              nextNewline = text.length
+            }
+
+            (text.substring(mostRecentNewline, nextNewline), guess - mostRecentNewline)
+          } else {
+            (text, guess)
+          }
         }
 
+        val contextForFeatures: String = makeStringContext(textForFeatures, guessForFeatures)
+
+        val features = featuresForEndPointDetection(textForFeatures, guessForFeatures)
         SentenceDecisionInstance(goldPoints.contains(guess),
-          featuresForEndPointDetection(slab.content, guess),
-          s"${f.getName}:$guess", context)
+          features,
+          s"${f.getName}:$guess", contextForFeatures)
       }
     }
 
@@ -405,16 +457,11 @@ object MLSentenceSegmenter {
       for ( (text, goldPoints) <- extraExamples) yield {
         val guessPoints: IndexedSeq[Int] = potentialSentenceBoundariesIterator(text).toIndexedSeq
         for (guess <- guessPoints) yield {
-          val contextBegin = math.max(0, guess - 50)
-          val contextEnd = math.min(text.length, guess + 50)
-          val context =   if (guess != text.length) {
-            text.substring(contextBegin, guess) + "[[" + text.charAt(guess) + "]]" +  text.substring(guess + 1, contextEnd)
-          } else {
-            text.substring(contextBegin, guess) + "[[]]"
-          }
+          val context: String = makeStringContext(text, guess)
 
+          val features = featuresForEndPointDetection(text, guess)
           SentenceDecisionInstance(goldPoints.contains(guess),
-            featuresForEndPointDetection(text, guess),
+            features,
             s"$text:$guess", context)
 
         }
@@ -454,6 +501,16 @@ object MLSentenceSegmenter {
 
   }
 
+  private def makeStringContext(text: String, position: Int): String = {
+    val contextBegin = math.max(0, position - 50)
+    val contextEnd = math.min(text.length, position + 50)
+    if (position != text.length) {
+      text.substring(contextBegin, position) + "[[" + text.charAt(position) + "]]" + text.substring(position + 1, contextEnd)
+    } else {
+      text.substring(contextBegin, position) + "[[]]"
+    }
+  }
+
   def evalDev(inf: ClassificationInference, dev: IndexedSeq[SentenceDecisionInstance], decoded: Counter[Feature, Double]) {
     var right = 0
     var wrong = 0
@@ -466,7 +523,7 @@ object MLSentenceSegmenter {
         println("===========")
         println(s"label: ${inst.label} id: ${inst.id} score: ${sum}")
         println(inst.context)
-        println(weights.sortBy(-_._2.abs).scanLeft(null: Any, 0.0, 0.0){ (acc, z) => (z._1, z._2, z._2 + acc._2)}.drop(1), sum)
+        println(weights.sortBy(-_._2.abs).scanLeft(null: Any, 0.0, 0.0){ (acc, z) => (z._1, z._2, z._2 + acc._3)}.drop(1), sum)
         wrong += 1
         if (inst.label) {
           fN += 1
