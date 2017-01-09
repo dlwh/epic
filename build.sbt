@@ -29,7 +29,7 @@ val VersionRegex = "v([0-9]+.[0-9]+.[0-9]+)-?(.*)?".r
 
 lazy val commonSettings = Seq(
   organization := "org.scalanlp",
-  version := "0.4",
+  version := "0.4.1",
 
 /*
   git.baseVersion := "0.4",
