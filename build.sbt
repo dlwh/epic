@@ -29,7 +29,9 @@ val VersionRegex = "v([0-9]+.[0-9]+.[0-9]+)-?(.*)?".r
 
 lazy val commonSettings = Seq(
   organization := "org.scalanlp",
+  version := "0.4",
 
+/*
   git.baseVersion := "0.4",
   // append -SNAPSHOT unless we're on a branch
   git.gitUncommittedChanges := false,//git.gitCurrentTags.value.isEmpty,
@@ -42,9 +44,10 @@ lazy val commonSettings = Seq(
       case _ => None
     }
   },
+  */
 
   scalaVersion := Version.scala,
-  crossScalaVersions := Seq("2.11.7", "2.10.4"),
+  crossScalaVersions := Seq("2.11.8", "2.10.4"),
   libraryDependencies ++= Seq(
     Library.breeze,
     Library.breezeConfig,
@@ -109,7 +112,7 @@ lazy val commonSettings = Seq(
 
 lazy val epicCore = project
   .in(file("."))
-  .enablePlugins(GitVersioning)
+  //.enablePlugins(GitVersioning)
   .settings(commonSettings: _*)
   .settings(
     name := "epic"
