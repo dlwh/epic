@@ -56,6 +56,13 @@ You can download the ```neuralcrf.parser``` model from:
 
 http://nlp.cs.berkeley.edu/projects/neuralcrf.shtml
 
+(As of March 1, 2017, this model does not work with the latest version of epic. If you want
+to use the pre-trained model, use the commit with hash
+
+8968e0966da28101744ce6f5bbb0de4345d9c594
+
+from March 30, 2016.)
+
 To train a new parser as described in the neural CRF paper, run the following command
 (note that you need to fill in paths for -cp, --treebank.path, and --word2vecPath):
 
