@@ -8,7 +8,7 @@ import scala.collection.concurrent.Map
 import java.util
 
 import scala.collection.{mutable, GenTraversableOnce}
-import com.typesafe.scalalogging.slf4j.LazyLogging
+import breeze.util.SerializableLogging
 
 @SerialVersionUID(1L)
 case class CacheBroker(path: File = null, copyFrom: File = null, clearCaches: String = "", autocommit: Boolean = true, disableWriteAheadLog: Boolean = false) extends Serializable {
@@ -44,7 +44,7 @@ case class CacheBroker(path: File = null, copyFrom: File = null, clearCaches: St
 
 }
 
-object CacheBroker extends LazyLogging {
+object CacheBroker extends SerializableLogging {
   private class ActualCache private[CacheBroker] (val path: File, val dbMaker: DBMaker, val autocommit: Boolean, copyFrom: File = null) {
     lazy val db = {
       val db = dbMaker.make()

@@ -1,7 +1,10 @@
 package epic.util
 
-import scala.concurrent.{Await, Future, ExecutionContext}
+import scala.concurrent.{ Await, ExecutionContext, Future }
 import java.util.concurrent.ConcurrentLinkedQueue
+
+import breeze.util.SerializableLogging
+
 import scala.concurrent.duration.Duration
 import scala.annotation.unchecked.uncheckedVariance
 
@@ -46,7 +49,7 @@ class FIFOWorkQueue[-In, Out](f: In=>Out)(implicit context: ExecutionContext) ex
 
 }
 
-object FIFOWorkQueue extends SafeLogging {
+object FIFOWorkQueue extends SerializableLogging {
   def apply[In, Out](iter: TraversableOnce[In])(f: In=>Out)(implicit context: ExecutionContext) = {
     val queue = new FIFOWorkQueue[In, Out](f)
     Future {

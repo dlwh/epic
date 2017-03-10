@@ -4,7 +4,7 @@ package kbest
 import epic.trees.BinarizedTree
 import epic.parser.projections.{AnchoredRuleMarginalProjector, ChartProjector}
 import epic.util.CacheBroker
-import com.typesafe.scalalogging.slf4j.LazyLogging
+import breeze.util.SerializableLogging
 
 /**
  * Produces a kbest list of parses, along with scores.
@@ -16,7 +16,7 @@ trait KBestParser[L, W] {
   def bestKParses(words: IndexedSeq[W], k: Int): IndexedSeq[(BinarizedTree[L], Double)]
 }
 
-object KBestParser extends LazyLogging {
+object KBestParser extends SerializableLogging {
   def apply[L, W](parser: Parser[L, W], proj: ChartProjector[L, W] = new AnchoredRuleMarginalProjector[L, W]()) = {
     new AStarKBestParser(parser, proj)
   }

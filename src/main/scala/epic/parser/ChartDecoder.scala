@@ -18,7 +18,7 @@ package epic.parser
 import epic.parser.projections.{AnchoredSpanProjector, ChartProjector, AnchoredPCFGProjector, AnchoredRuleMarginalProjector}
 import epic.trees._
 import breeze.collection.mutable.TriangularArray
-import epic.util.SafeLogging
+import breeze.util.SerializableLogging
 import breeze.linalg.argmax
 
 trait ParserException extends Exception
@@ -48,7 +48,7 @@ object ChartDecoder {
  * @author dlwh
  */
 @SerialVersionUID(2)
-case class ViterbiDecoder[L, W]() extends ChartDecoder[L, W] with Serializable with SafeLogging {
+case class ViterbiDecoder[L, W]() extends ChartDecoder[L, W] with Serializable with SerializableLogging {
 
   override def wantsMaxMarginal: Boolean = true
 

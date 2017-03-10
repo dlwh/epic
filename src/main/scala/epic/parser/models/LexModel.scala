@@ -23,7 +23,7 @@ import breeze.collection.mutable.{OpenAddressHashArray, TriangularArray}
 import breeze.config.Help
 import breeze.linalg._
 import breeze.util._
-import com.typesafe.scalalogging.slf4j.LazyLogging
+import breeze.util.SerializableLogging
 import epic.constraints.ChartConstraints
 import epic.constraints.ChartConstraints.Factory
 import epic.features.SplitSpanFeaturizer.ZeroSplitSpanFeaturizer
@@ -824,7 +824,7 @@ case class LexGrammarBundle[L, L2, W](topology: RuleTopology[L],
   }
 }
 
-object IndexedLexFeaturizer extends LazyLogging {
+object IndexedLexFeaturizer extends SerializableLogging {
   def extract[L, L2, Datum, W](ruleFeaturizer: ProductionFeaturizer[L, L2, W],
                            bilexFeaturizer: IndexedBilexicalFeaturizer[W],
                            splitSpanFeaturizer: Option[IndexedSplitSpanFeaturizer[W]],
@@ -939,7 +939,7 @@ case class LexModelFactory(@Help(text= "The kind of annotation to do on the refi
                            @Help(text="How common must a feature be before we remember it?")
                            minFeatCutoff: Int = 1,
                            useSpanFeatures: Boolean = false,
-                           useBilexRuleFeatures: Boolean = true) extends ParserModelFactory[AnnotatedLabel, String] with SafeLogging {
+                           useBilexRuleFeatures: Boolean = true) extends ParserModelFactory[AnnotatedLabel, String] with SerializableLogging {
   type MyModel = LexModel[AnnotatedLabel, AnnotatedLabel, String]
 
   override def make(trainTrees: IndexedSeq[TreeInstance[AnnotatedLabel, String]],

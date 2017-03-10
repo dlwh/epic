@@ -2,7 +2,7 @@ package epic.features
 
 import breeze.util.Index
 import epic.util.{LockableSeenSet, ThreadLocalBloomFilter}
-import epic.util.SafeLogging
+import breeze.util.SerializableLogging
 
 /**
  * TODO
@@ -14,7 +14,7 @@ class HashExtendingIndex[T](val baseIndex: Index[T],
                             hashScale: HashFeature.Scale = HashFeature.Relative(1),
                             // we expect ~1 million features, 8MB gives about a 2% error rate
                             //= new ThreadLocalBloomFilter(8 * 1024 * 1024, 6)
-                            cache: LockableSeenSet[Long] = LockableSeenSet.always) extends Index[T] with SafeLogging {
+                            cache: LockableSeenSet[Long] = LockableSeenSet.always) extends Index[T] with SerializableLogging {
   val numHashFeatures = hashScale.numFeatures(baseIndex.size)
   override def size: Int = baseIndex.size + numHashFeatures
 

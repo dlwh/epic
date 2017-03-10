@@ -21,7 +21,7 @@ import breeze.linalg._
 import breeze.optimize._
 import epic.trees.{ProcessedTreebank, AnnotatedLabel, TreeInstance}
 import breeze.config.{CommandLineParser, Help}
-import com.typesafe.scalalogging.slf4j.LazyLogging
+import breeze.util.SerializableLogging
 import epic.parser.projections.{GrammarRefinements, OracleParser, ParserChartConstraintsFactory}
 import epic.util.CacheBroker
 import epic.parser.ParserParams.XbarGrammar
@@ -44,7 +44,7 @@ import epic.dense.AdadeltaGradientDescentDVD
  *
  *
  */
-object ParserTrainer extends epic.parser.ParserPipeline with LazyLogging {
+object ParserTrainer extends epic.parser.ParserPipeline with SerializableLogging {
 
   case class Params(@Help(text="What parser to build. LatentModelFactory,StructModelFactory,LexModelFactory,SpanModelFactory")
                     modelFactory: ParserExtractableModelFactory[AnnotatedLabel, String],
@@ -214,7 +214,7 @@ object ParserTrainer extends epic.parser.ParserPipeline with LazyLogging {
   }
 }
 
-object Suffixes extends LazyLogging {
+object Suffixes extends SerializableLogging {
 
   def main(args: Array[String]):Unit = {
     val tb = CommandLineParser.readIn[ProcessedTreebank](args)

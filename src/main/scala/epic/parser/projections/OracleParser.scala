@@ -4,7 +4,7 @@ import epic.constraints.{CachedChartConstraintsFactory, ChartConstraints}
 import epic.trees._
 import epic.parser._
 import breeze.numerics.I
-import epic.util.{Optional, SafeLogging, CacheBroker}
+import epic.util.{Optional, CacheBroker}
 import epic.parser.GrammarAnchoring.StructureDelegatingAnchoring
 import breeze.config.{Configuration, CommandLineParser, Help}
 import java.io.File
@@ -40,7 +40,7 @@ import epic.constraints.ChartConstraints.UnifiedFactory
  *
  * @author dlwh
  */
-class OracleParser[L, L2, W](val grammar: SimpleGrammar[L, L2, W], backupGrammar: Optional[SimpleGrammar[L, L2, W]] = None) extends SafeLogging {
+class OracleParser[L, L2, W](val grammar: SimpleGrammar[L, L2, W], backupGrammar: Optional[SimpleGrammar[L, L2, W]] = None) extends SerializableLogging {
   private val cache = CacheBroker().make[IndexedSeq[W], BinarizedTree[L2]]("OracleParser")
 
   private var problems  = 0

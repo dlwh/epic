@@ -1,10 +1,10 @@
 package epic.features
 
 import breeze.collection.mutable.OpenAddressHashArray
-import breeze.linalg.{VectorBuilder, SparseVector, DenseVector, CSCMatrix}
-import breeze.util.Index
+import breeze.linalg.{ CSCMatrix, DenseVector, SparseVector, VectorBuilder }
+import breeze.util.{ Index, SerializableLogging }
 import epic.framework.Feature
-import epic.util.{Arrays, LockableSeenSet, SafeLogging}
+import epic.util.{ Arrays, LockableSeenSet }
 
 import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
@@ -234,7 +234,7 @@ object CrossProductIndex {
                       id: String = "CrossProductIndex",
                       val includeLabelOnlyFeatures: Boolean = true,
                       minCount: Int = 1,
-                      seenSet: LockableSeenSet[Long] = LockableSeenSet.always) extends SafeLogging {
+                      seenSet: LockableSeenSet[Long] = LockableSeenSet.always) extends SerializableLogging {
     def add(a: A, b: B): Int = add(firstIndex(a), secondIndex(b))
 
     private val counts = Array.fill(firstIndex.size)(new OpenAddressHashArray[Int](secondIndex.size max 1, 0, 4))

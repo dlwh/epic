@@ -19,13 +19,13 @@ package epic.framework
 import epic.inference.{ExpectationPropagation, Factor}
 
 import collection.mutable.ArrayBuffer
-import epic.util.SafeLogging
+import breeze.util.SerializableLogging
 import java.util.concurrent.atomic.AtomicLong
 import epic.parser.ParseMarginal
 
 class EPInference[Datum, Augment <: AnyRef](val inferences: IndexedSeq[ProjectableInference[Datum, Augment]],
                                   val maxEPIter: Int,
-                                  val epInGold: Boolean = false)(implicit aIsFactor: Augment <:< Factor[Augment]) extends ProjectableInference[Datum, Augment] with SafeLogging with Serializable {
+                                  val epInGold: Boolean = false)(implicit aIsFactor: Augment <:< Factor[Augment]) extends ProjectableInference[Datum, Augment] with SerializableLogging with Serializable {
   type Marginal = EPMarginal[Augment, ProjectableInference[Datum, Augment]#Marginal]
   type ExpectedCounts = EPExpectedCounts
   type Scorer = EPScorer[ProjectableInference[Datum, Augment]#Scorer]
@@ -63,7 +63,7 @@ class EPInference[Datum, Augment <: AnyRef](val inferences: IndexedSeq[Projectab
 
 case class EPMarginal[Augment, Marginal](logPartition: Double, q: Augment, marginals: IndexedSeq[Marginal]) extends epic.framework.Marginal
 
-object EPInference extends SafeLogging {
+object EPInference extends SerializableLogging {
   val iters, calls = new AtomicLong(0)
 
   def doInference[Datum, Augment <: AnyRef,

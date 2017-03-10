@@ -1,12 +1,9 @@
 package epic.parser
 
-import epic.trees.{Span, UnaryTree, BinarizedTree}
-import epic.util.{SafeLogging, Arrays}
-import breeze.numerics
 import breeze.collection.mutable.TriangularArray
-import com.typesafe.scalalogging.slf4j.LazyLogging
-import breeze.linalg.{max, DenseVector, softmax, Counter2}
-import epic.constraints.ChartConstraints
+import breeze.linalg.{ Counter2, max, softmax }
+import breeze.util.SerializableLogging
+import epic.trees.{ BinarizedTree, Span, UnaryTree }
 
 /*
  Copyright 2012 David Hall
@@ -34,12 +31,14 @@ import epic.constraints.ChartConstraints
  * @param outside outside chart
  * @param logPartition the normalization constant aka inside score of the root aka probability of the sentence
  * @tparam L the label type
- * @tparam W the word type
- */
-final case class RefinedChartMarginal[L, W](anchoring: GrammarAnchoring[L, W],
-                                     inside: RefinedParseChart[L], outside: RefinedParseChart[L],
-                                     logPartition: Double,
-                                     override val isMaxMarginal: Boolean) extends ParseMarginal[L, W] with SafeLogging {
+  * @tparam W the word type
+  */
+final case class RefinedChartMarginal[L, W](
+    anchoring: GrammarAnchoring[L, W],
+    inside: RefinedParseChart[L], outside: RefinedParseChart[L],
+    logPartition: Double,
+    override val isMaxMarginal: Boolean
+) extends ParseMarginal[L, W] with SerializableLogging {
 
   override def insideTopScore(begin: Int, end: Int, sym: Int, ref: Int): Double = inside.top(begin, end, sym, ref)
   override def insideBotScore(begin: Int, end: Int, sym: Int, ref: Int): Double = inside.bot(begin, end, sym, ref)

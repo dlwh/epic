@@ -3,13 +3,13 @@ package epic.lexicon
 import breeze.linalg._
 import breeze.util.Index
 import epic.features.EnglishWordClassGenerator
-import epic.util.SafeLogging
+import breeze.util.SerializableLogging
 
 /**
  * A lexicon that backs off to a signature when it decides which tags to allow.
  */
 @SerialVersionUID(1L)
-class SignatureLexicon[L, W](val labelIndex: Index[L], allowed: Map[W, Set[Int]], signature: W => W) extends Lexicon[L, W] with Serializable with SafeLogging {
+class SignatureLexicon[L, W](val labelIndex: Index[L], allowed: Map[W, Set[Int]], signature: W => W) extends Lexicon[L, W] with Serializable with SerializableLogging {
 
   override def morePermissive: Lexicon[L, W] = {
     new SignatureLexicon(labelIndex, Map.empty[W, Set[Int]].withDefaultValue(allTags), signature)

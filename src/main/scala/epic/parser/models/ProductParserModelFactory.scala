@@ -17,15 +17,17 @@ package epic.parser.models
 */
 
 import java.io.File
-import epic.trees.annotations.{Xbarize, TreeAnnotator, FilterAnnotations}
+
+import epic.trees.annotations.{ FilterAnnotations, TreeAnnotator, Xbarize }
+
 import io.Source
 import breeze.linalg._
+import breeze.util.SerializableLogging
 import epic.parser.projections.GrammarRefinements
 import epic.framework.Feature
 import epic.parser._
 import epic.trees._
-import epic.features.{IndicatorFeature, WordPropertyFeaturizer, MinimalWordFeaturizer, IndexedWordFeaturizer}
-import epic.util.{SafeLogging, CacheBroker}
+import epic.features.{ IndexedWordFeaturizer, IndicatorFeature, MinimalWordFeaturizer, WordPropertyFeaturizer }
 import epic.framework.ComponentFeature
 import epic.trees.BinaryRule
 import epic.trees.UnaryRule
@@ -43,7 +45,7 @@ case class ProductParserModelFactory(annotator: TreeAnnotator[AnnotatedLabel, St
                                      numStates: Int = 2,
                                      numModels: Int = 2,
                                      oldWeights: File = null,
-                                     splitFactor: Int = 1)  extends ParserModelFactory[AnnotatedLabel, String] with SafeLogging {
+                                     splitFactor: Int = 1)  extends ParserModelFactory[AnnotatedLabel, String] with SerializableLogging {
 
   type MyModel = LatentParserModel[AnnotatedLabel, (AnnotatedLabel, Seq[Int]), String]
 

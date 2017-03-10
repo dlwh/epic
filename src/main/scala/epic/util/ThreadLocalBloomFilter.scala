@@ -1,6 +1,6 @@
 package epic.util
 
-import breeze.util.BloomFilter
+import breeze.util.{ BloomFilter, SerializableLogging }
 import java.util.concurrent.ConcurrentLinkedDeque
 
 import scala.collection.JavaConverters._
@@ -11,7 +11,7 @@ import scala.collection.JavaConverters._
  * @author dlwh
  **/
 @SerialVersionUID(1L)
-class ThreadLocalBloomFilter[@specialized(Int, Long) T](numBuckets: Int, numHashFunctions: Int) extends LockableSeenSet[T] with SafeLogging {
+class ThreadLocalBloomFilter[@specialized(Int, Long) T](numBuckets: Int, numHashFunctions: Int) extends LockableSeenSet[T] with SerializableLogging {
   private val tl = new ThreadLocal[BloomFilter[T]]() {
     override def initialValue(): BloomFilter[T] = {
       val bf = new BloomFilter[T](numBuckets, numHashFunctions)

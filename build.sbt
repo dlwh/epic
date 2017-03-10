@@ -47,12 +47,11 @@ lazy val commonSettings = Seq(
   */
 
   scalaVersion := Version.scala,
-  crossScalaVersions := Seq("2.11.8", "2.10.4"),
+  crossScalaVersions := Seq("2.12.1", "2.11.8", "2.10.4"),
   libraryDependencies ++= Seq(
     Library.breeze,
     Library.breezeConfig,
     Library.mapdb,
-    Library.scalaLoggingSlf4j,
     Library.tikaParsers % "compile,optional",
     Library.boilerpipe,
     Library.nekohtml,
@@ -87,11 +86,9 @@ lazy val commonSettings = Seq(
     "Sonatype Snapshots" at "https://oss.sonatype.org/content/repositories/snapshots/"
   ),
   libraryDependencies ++= (CrossVersion.partialVersion(scalaVersion.value) match {
-      // if scala 2.11+ is used, add dependency on scala-xml module
-      case Some((2, scalaMajor)) if scalaMajor >= 11 =>
-      Seq("org.scala-lang.modules" %% "scala-xml" % "1.0.1")
-      case _ =>
-      Seq.empty
+      case Some((2, scalaMajor)) if scalaMajor >= 12 => Seq("org.scala-lang.modules" %% "scala-xml" % "1.0.6")
+      case Some((2, scalaMajor)) if scalaMajor >= 11 => Seq("org.scala-lang.modules" %% "scala-xml" % "1.0.6")
+      case _ => Seq.empty
       })
 
   ) ++ sbtjflex.SbtJFlexPlugin.jflexSettings ++ net.virtualvoid.sbt.graph.Plugin.graphSettings ++

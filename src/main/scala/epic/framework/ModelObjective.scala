@@ -1,16 +1,14 @@
 package epic.framework
 
-import collection.GenTraversable
-import breeze.optimize.BatchDiffFunction
-import breeze.linalg.DenseVector
-import breeze.util.Encoder
 import java.util.concurrent.atomic.AtomicInteger
-import collection.parallel.ForkJoinTaskSupport
-import concurrent.forkjoin.ForkJoinPool
-import com.typesafe.scalalogging.slf4j.LazyLogging
-import epic.util.{SafeLogging, CacheBroker}
-import epic.trees.AnnotatedLabel
-import epic.trees.TreeInstance
+
+import breeze.linalg.DenseVector
+import breeze.optimize.BatchDiffFunction
+import breeze.util.{ Encoder, SerializableLogging }
+
+import scala.collection.GenTraversable
+import scala.collection.parallel.ForkJoinTaskSupport
+import scala.concurrent.forkjoin.ForkJoinPool
 
 /**
  * The objective function for training a [[epic.framework.Model]]. Selects
@@ -21,10 +19,10 @@ import epic.trees.TreeInstance
  */
 class ModelObjective[Datum](val model: Model[Datum],
                             batchSelector: IndexedSeq[Int]=>GenTraversable[Datum],
-                            val fullRange: IndexedSeq[Int]) extends BatchDiffFunction[DenseVector[Double]] with SafeLogging {
+                            val fullRange: IndexedSeq[Int]) extends BatchDiffFunction[DenseVector[Double]] with SerializableLogging {
   def this(model: Model[Datum], data: IndexedSeq[Datum], numThreads: Int = -1) = this(model,ModelObjective.makePar(data, numThreads)(_), data.indices)
 
-  import model.{ExpectedCounts => _, _}
+  import model.{ ExpectedCounts => _, _ }
 
   type Builder = model.Inference
 

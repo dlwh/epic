@@ -1,14 +1,16 @@
 package epic.util
 
-import com.typesafe.scalalogging.slf4j.Logger
 import java.util.concurrent.atomic.AtomicInteger
+
+import breeze.util.LazyLogger
+import org.slf4j.Logger
 
 /**
  *
  *
  * @author dlwh
  */
-class ProgressLog(log: Logger, items: Int, frequency: Int = 100, name: String = "Progress") {
+class ProgressLog(log: LazyLogger, items: Int, frequency: Int = 100, name: String = "Progress") {
   val initialTime = System.currentTimeMillis()
   val item = new AtomicInteger()
 

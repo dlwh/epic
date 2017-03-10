@@ -1,7 +1,7 @@
 package epic.sequences
 
 import epic.framework.EvaluationResult
-import com.typesafe.scalalogging.slf4j.LazyLogging
+import breeze.util.SerializableLogging
 
 
 /**
@@ -10,7 +10,7 @@ import com.typesafe.scalalogging.slf4j.LazyLogging
  *
  * @author dlwh
  */
-object SegmentationEval extends LazyLogging {
+object SegmentationEval extends SerializableLogging {
 
   def eval[L ,W](crf: SemiCRF[L, W], examples: IndexedSeq[Segmentation[L, W]], logOnlyErrors: Boolean = true):Stats = {
     examples.par.aggregate(new Stats(0,0,0)) ({ (stats, gold )=>

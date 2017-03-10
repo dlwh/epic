@@ -9,7 +9,7 @@ import epic.features._
 import epic.lexicon.{ SignatureLexicon, SimpleLexicon }
 import java.util
 
-import epic.util.{ Optional, ProgressLog, SafeLogging }
+import epic.util.{ Optional, ProgressLog }
 import epic.constraints.TagConstraints
 
 /**
@@ -128,7 +128,7 @@ class TaggedSequenceModelFactory[L](val startSymbol: L,
                                     wordFeaturizer: Optional[WordFeaturizer[String]] = None,
                                     transitionFeaturizer: Optional[WordFeaturizer[String]] = None,
                                     weights: Feature=>Double = { (f:Feature) => 0.0},
-                                    hashFeatureScale: Double = 0.0) extends SafeLogging {
+                                    hashFeatureScale: Double = 0.0) extends SerializableLogging {
 
   import TaggedSequenceModelFactory._
 

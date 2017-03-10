@@ -30,9 +30,9 @@ import breeze.numerics._
 import java.util
 import epic.lexicon.Lexicon
 import epic.constraints.{CachedChartConstraintsFactory, ChartConstraints}
-import epic.util.{SafeLogging, CacheBroker}
+import epic.util.CacheBroker
 import scala.collection.GenTraversable
-import com.typesafe.scalalogging.slf4j.{LazyLogging, Logger}
+import breeze.util.SerializableLogging
 import java.util.concurrent.atomic.AtomicInteger
 
 /**
@@ -42,7 +42,7 @@ import java.util.concurrent.atomic.AtomicInteger
 @SerialVersionUID(1L)
 class ParserChartConstraintsFactory[L, W](val parser: Parser[L, W],
                                           val isIntermediate: L=>Boolean,
-                                          threshold: Double = math.exp(-9)) extends ChartConstraints.Factory[L, W] with Serializable with SafeLogging {
+                                          threshold: Double = math.exp(-9)) extends ChartConstraints.Factory[L, W] with Serializable with SerializableLogging {
   require(threshold >= 0 && threshold <= 1, s"Threshold must be between 0 and 1, but whas $threshold")
   import parser._
   def labelIndex = topology.labelIndex
@@ -256,7 +256,7 @@ object ParserChartConstraintsFactory {
   * Object for creating  [[epic.constraints.CachedChartConstraintsFactory]]
  * from a parser and prepopulating it with the contents of a treebank.
   */
-object PrecacheConstraints extends LazyLogging {
+object PrecacheConstraints extends SerializableLogging {
   case class ProjectionParams(treebank: ProcessedTreebank,
                               @Help(text="Location of the parser")
                               parser: File,

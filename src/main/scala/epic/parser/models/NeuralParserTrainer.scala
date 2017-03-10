@@ -2,7 +2,7 @@ package epic.parser.models
 
 import java.io.File
 
-import com.typesafe.scalalogging.slf4j.LazyLogging
+import breeze.util.SerializableLogging
 
 import breeze.config.Help
 import breeze.linalg._
@@ -32,7 +32,7 @@ import epic.util.CacheBroker
  *
  *
  */
-object NeuralParserTrainer extends epic.parser.ParserPipeline with LazyLogging {
+object NeuralParserTrainer extends epic.parser.ParserPipeline with SerializableLogging {
   
   case class ExtraPTParams(momentum: Double = 0.95,
                            computeTrainLL: Boolean = true)

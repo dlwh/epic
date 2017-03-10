@@ -4,14 +4,14 @@ import breeze.linalg._
 import breeze.stats.distributions.Rand
 import scala.collection.mutable.ArrayBuffer
 import scala.collection.GenTraversableOnce
-import com.typesafe.scalalogging.slf4j.LazyLogging
+import breeze.util.SerializableLogging
 
 /*
 class StructSVM[Datum](val model: Model[Datum],
                        maxIter: Int = 100,
                        batchSize: Int = 100,
                        maxSMOIterations: Int = 100,
-                       C: Double = 100) extends LazyLogging {
+                       C: Double = 100) extends SerializableLogging {
 
   import model._
 

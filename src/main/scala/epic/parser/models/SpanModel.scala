@@ -24,7 +24,7 @@ import breeze.config.Help
 import breeze.linalg._
 import breeze.optimize.FirstOrderMinimizer.OptParams
 import breeze.util._
-import com.typesafe.scalalogging.slf4j.LazyLogging
+import breeze.util.SerializableLogging
 import epic.constraints.ChartConstraints.Factory
 import epic.constraints.{CachedChartConstraintsFactory, ChartConstraints}
 import epic.features._
@@ -338,7 +338,7 @@ You can also epic.trees.annotations.KMAnnotator to get more or less Klein and Ma
                             useSplitShape: Boolean = false,
                             posFeaturizer: Optional[WordFeaturizer[String]] = None,
                             spanFeaturizer: Optional[SplitSpanFeaturizer[String]] = None,
-                            extraParams: ExtraParams = ExtraParams()) extends ParserModelFactory[AnnotatedLabel, String] with SafeLogging {
+                            extraParams: ExtraParams = ExtraParams()) extends ParserModelFactory[AnnotatedLabel, String] with SerializableLogging {
   
   type MyModel = SpanModel[AnnotatedLabel, AnnotatedLabel, String]
 
@@ -448,7 +448,7 @@ case class LatentSpanModelFactory(inner: SpanModelFactory,
                                   @Help(text="Split states that the Berkeley Parser doesn't want to split.")
                                   splitUselessStates: Boolean = false,
                                   @Help(text="Number of states to use. Overridden by substates file")
-                                  numStates: Int = 2) extends ParserModelFactory[AnnotatedLabel, String] with LazyLogging {
+                                  numStates: Int = 2) extends ParserModelFactory[AnnotatedLabel, String] with SerializableLogging {
 
   type MyModel = SpanModel[AnnotatedLabel, (AnnotatedLabel, Int), String]
 

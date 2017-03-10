@@ -24,7 +24,7 @@ import java.util.concurrent.atomic.AtomicInteger
 import epic.framework.EvaluationResult
 import collection.parallel.ForkJoinTaskSupport
 import concurrent.forkjoin.ForkJoinPool
-import com.typesafe.scalalogging.slf4j.LazyLogging
+import breeze.util.SerializableLogging
 import java.text.DecimalFormat
 import epic.util.ProgressLog
 
@@ -64,7 +64,7 @@ class ParseEval[L](ignoredLabels: Set[L]) {
   }
 }
 
-object ParseEval extends LazyLogging {
+object ParseEval extends SerializableLogging {
 
   case class Statistics(guess: Int, gold: Int, right: Int, numExact: Int,
                         tagsRight: Int, numWords: Int,

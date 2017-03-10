@@ -5,14 +5,14 @@ import breeze.collection.mutable.TriangularArray
 import breeze.features.FeatureVector
 import breeze.linalg._
 import breeze.util._
-import com.typesafe.scalalogging.slf4j.LazyLogging
+import breeze.util.SerializableLogging
 import epic.constraints.LabeledSpanConstraints
 import epic.features._
 import epic.framework._
 import epic.lexicon.SimpleLexicon
 import epic.sequences.SemiCRF.{IdentityAnchoring, TransitionVisitor}
 import epic.sequences.SemiCRFModel.BIEOFeatureAnchoring
-import epic.util.{Optional, SafeLogging}
+import epic.util.{Optional}
 
 import scala.collection.mutable.ArrayBuffer
 
@@ -231,7 +231,7 @@ class SegmentationModelFactory[L](wordFeaturizer: Optional[WordFeaturizer[String
                                   spanFeaturizer: Optional[SurfaceFeaturizer[String]] = None,
                                   pruningModel: Optional[SemiCRF.ConstraintSemiCRF[L, String]] = None,
                                   gazetteer: Optional[Gazetteer[Any, String]] = None,
-                                  weights: Feature=>Double = { (f:Feature) => 0.0}) extends LazyLogging {
+                                  weights: Feature=>Double = { (f:Feature) => 0.0}) extends SerializableLogging {
 
   import epic.sequences.SegmentationModelFactory._
 
@@ -311,7 +311,7 @@ object SegmentationModelFactory extends Serializable {
                                                  bioeFeatures: Array[Array[Array[Int]]], // label -> kind -> indexes into surfaceFeaturizer.labelFeatureIndex
                                                  transitionFeatures: Array[Array[Array[Int]]], // prev -> cur -> indexes into surfaceFeaturizer.labelFeatureIndex
                                                  val labelIndex: OptionIndex[L],
-                                                 val constraintFactory: LabeledSpanConstraints.Factory[L, W]) extends SemiCRFModel.BIEOFeaturizer[L,W] with Serializable with SafeLogging {
+                                                 val constraintFactory: LabeledSpanConstraints.Factory[L, W]) extends SemiCRFModel.BIEOFeaturizer[L,W] with Serializable with SerializableLogging {
 
     val featureIndex = SegmentedIndex(wordFeatureIndex, spanFeatureIndex)
     private val wordOffset = featureIndex.componentOffset(0)

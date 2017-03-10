@@ -19,7 +19,7 @@ import breeze.linalg._
 import epic.inference.Factor
 import collection.mutable.ArrayBuffer
 import breeze.util._
-import epic.util.{SafeLogging, CacheBroker}
+import epic.util.CacheBroker
 import breeze.stats.distributions.Rand
 
 /**
@@ -27,7 +27,7 @@ import breeze.stats.distributions.Rand
  * @author dlwh
  */
 class EPModel[Datum, Augment <: AnyRef](maxEPIter: Int, initFeatureValue: Feature => Option[Double] = {(_:Feature) => None}, epInGold: Boolean = false, dropOutFraction: Double = 0.0)(
-                              _models: EPModel.CompatibleModel[Datum, Augment]*)(implicit aIsFactor: Augment <:< Factor[Augment]) extends Model[Datum] with SafeLogging {
+                              _models: EPModel.CompatibleModel[Datum, Augment]*)(implicit aIsFactor: Augment <:< Factor[Augment]) extends Model[Datum] with SerializableLogging {
   def models = _models
   type ExpectedCounts = EPExpectedCounts
   type Inference = EPInference[Datum, Augment]

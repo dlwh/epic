@@ -1,7 +1,7 @@
 package epic.parser
 
 import epic.parser.projections.AnchoredPCFGProjector
-import epic.util.SafeLogging
+import breeze.util.SerializableLogging
 import epic.constraints.ChartConstraints
 import epic.framework.{EPScorer, EPInference}
 import epic.trees.TreeInstance
@@ -13,7 +13,7 @@ import epic.parser.models.AnnotatedParserInference
  *
  * @author dlwh
  **/
-case class EPChartFactory[L, W](topology: RuleTopology[L], lexicon: Lexicon[L, W], epInference: EPInference[TreeInstance[L, W], UnrefinedGrammarAnchoring[L, W]]) extends ParseMarginal.Factory[L, W] with SafeLogging {
+case class EPChartFactory[L, W](topology: RuleTopology[L], lexicon: Lexicon[L, W], epInference: EPInference[TreeInstance[L, W], UnrefinedGrammarAnchoring[L, W]]) extends ParseMarginal.Factory[L, W] with SerializableLogging {
   def apply(words: IndexedSeq[W], initialCore: ChartConstraints[L]): ParseMarginal[L, W] = {
     val scorer = epInference.scorer(TreeInstance("", null, words))
     val marg = epInference.marginal(scorer, TreeInstance("", null, words), UnrefinedGrammarAnchoring.identity(topology, lexicon, words, initialCore) )

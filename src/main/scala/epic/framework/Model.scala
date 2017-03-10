@@ -18,8 +18,8 @@ package epic.framework
 import java.io.File
 
 import breeze.linalg._
-import breeze.util.Index
-import epic.util.{SafeLogging, WeightsCache}
+import breeze.util.{ Index, SerializableLogging }
+import epic.util.WeightsCache
 
 /**
  * A Model represents a class for turning weight vectors into [[epic.framework.Inference]]s.
@@ -29,7 +29,7 @@ import epic.util.{SafeLogging, WeightsCache}
  *
  * @tparam Datum the kind of
  */
-trait Model[Datum] extends SafeLogging { self =>
+trait Model[Datum] extends SerializableLogging { self =>
   type ExpectedCounts >: Null <: epic.framework.ExpectedCounts[ExpectedCounts]
   type Marginal <: epic.framework.Marginal
   type Scorer

@@ -11,7 +11,7 @@ import epic.framework._
 import epic.constraints.{LabeledSpanConstraints, SpanConstraints, ChartConstraints}
 import breeze.optimize._
 import breeze.optimize.FirstOrderMinimizer.OptParams
-import com.typesafe.scalalogging.slf4j.LazyLogging
+import breeze.util.SerializableLogging
 import epic.parser.models.SpanModelFactory
 import epic.trees.ProcessedTreebank
 import epic.trees.TreeInstance
@@ -27,7 +27,7 @@ import epic.dense.AdadeltaGradientDescentDVD
  *
  * @author dlwh
  */
-object SentimentTreebankPipeline extends LazyLogging {
+object SentimentTreebankPipeline extends SerializableLogging {
   case class Options(@Help(text="Treebank path")
                      path: File,
                      @Help(text="Name for the model")
