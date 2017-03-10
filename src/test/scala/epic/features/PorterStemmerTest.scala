@@ -33,7 +33,7 @@ class PorterStemmerTest extends FunSuite with Checkers {
     val stems = Source.fromInputStream(sStream).getLines()
     try {
       for ((w, s) <- words zip stems) {
-        expectResult(s, w)(PorterStemmer(w))
+        assert(PorterStemmer(w) == s, w)
       }
     } finally {
       wStream.close()

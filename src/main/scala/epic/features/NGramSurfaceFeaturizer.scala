@@ -1,13 +1,16 @@
 package epic.features
 
 import epic.framework.Feature
+
 import scala.collection.mutable.ArrayBuffer
 import breeze.util.CachedHashCode
+import epic.util.TwoTwelveSupport
+
 import scala.runtime.ScalaRunTime
 
 case class OrientedNGramFeature(offset: Int, features: IndexedSeq[Feature]) extends Feature with CachedHashCode {
   override def equals(other: Any): Boolean = other match {
-    case x: OrientedNGramFeature => x.hashCode == hashCode && ScalaRunTime._equals(this, x)
+    case x: OrientedNGramFeature => x.hashCode == hashCode && TwoTwelveSupport._equals(this, x)
     case _ => false
   }
 }

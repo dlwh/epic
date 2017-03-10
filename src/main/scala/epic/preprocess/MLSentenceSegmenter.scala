@@ -107,10 +107,13 @@ object MLSentenceSegmenter {
   }
   case class ContextWord(w: String, offset: Int = 0) extends Feature
   case class LastWordLength(len: Int, offset: Int = 0) extends Feature
+  @SerialVersionUID(-2080712838462299209L)
   case object EOFFeature extends Feature
   case object BOFFeature extends Feature
+  @SerialVersionUID(8117974141443304644L)
   case object BiasFeature extends Feature
   case class JavaDistFeature(x: Int) extends Feature
+  @SerialVersionUID(4081948270063241907L)
   case object LineIsShortFeature extends Feature
 
   private def stringForCharType(ct: Int): String = {

@@ -28,8 +28,8 @@ import repl.DSLGrammar
 @RunWith(classOf[JUnitRunner])
 class InsideOutsideTest extends FunSuite {
 
-  implicit def near(x: Double) = new {
-    def near(y: Double) = if ( (x-y).abs < 1E-4 * math.max(x+y,1E-4)/2) None else Some(x + " not near " + y)
+  implicit class Near(val x: Double) {
+    def near(y: Double) = (x-y).abs < 1E-4 * math.max(x+y,1E-4)/2
   }
 
   test("Simple test from iobasics") {

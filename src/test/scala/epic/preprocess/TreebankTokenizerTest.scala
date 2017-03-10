@@ -7,8 +7,7 @@ import scala.io.{ Codec, Source }
 
 class TreebankTokenizerTest  extends FunSuite {
 
-  private def isOneToken(w: String) =
-    if (w === TreebankTokenizer(w).head) None else Some(w + " " +  TreebankTokenizer(w))
+  private def isOneToken(w: String) = w === TreebankTokenizer(w).head
 
   test("simple words") {
     val words = List("Hi","there","pilgrim","happy","Thanksgiving","there")
