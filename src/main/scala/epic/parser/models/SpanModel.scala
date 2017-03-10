@@ -313,7 +313,8 @@ case class ExtraParams(useHackyLexicalFeatures:Boolean = false,
                        useMorph:Boolean = false,
                        useTagSpanShape:Boolean = false,
                        pathsToMorph:String = "")
-  
+
+@SerialVersionUID(5415542513198973305L)
 case class SpanModelFactory(@Help(text=
                               """The kind of annotation to do on the refined grammar. Default uses just parent annotation.
 You can also epic.trees.annotations.KMAnnotator to get more or less Klein and Manning 2003.

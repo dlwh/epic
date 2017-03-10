@@ -9,6 +9,7 @@ import breeze.util.SerializableLogging
  *
  * @author dlwh
  **/
+@SerialVersionUID(-5376213550426304522L)
 class HashExtendingIndex[T](val baseIndex: Index[T],
                             hashWrapper: Int=>T,
                             hashScale: HashFeature.Scale = HashFeature.Relative(1),
