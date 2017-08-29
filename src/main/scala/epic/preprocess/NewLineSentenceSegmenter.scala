@@ -14,7 +14,8 @@ class NewLineSentenceSegmenter(locale: Locale = Locale.getDefault) extends Sente
   private val regex = Pattern.compile("\n+")
 
   override def apply[In](slab: StringSlab[In]): StringSlab[In with Sentence] = {
-    val m = regex.matcher(slab.content)
+    val text = slab.content
+    val m = regex.matcher(text)
 
     val spans = new ArrayBuffer[(Span, Sentence)]()
 
@@ -25,9 +26,9 @@ class NewLineSentenceSegmenter(locale: Locale = Locale.getDefault) extends Sente
         spans += (Span(start, end) -> Sentence())
       start = end
     }
-    spans += Span(start, slab.content.length) -> Sentence()
+    spans += Span(start, text.length) -> Sentence()
 
-    slab.addLayer[Sentence](spans)
+    slab.addLayer[Sentence](spans.filterNot(s => text.substring(s._1.begin, s._1.end).forall(_.isWhitespace)))
   }
 }
 
