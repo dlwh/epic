@@ -37,6 +37,9 @@ case class MLSentenceSegmenter(inf: MLSentenceSegmenter.ClassificationInference)
             } else {
               rec()
             }
+          } else if (lastOffset == 0) {
+            lastOffset = text.length + 1
+            Some(Span(0, text.length) -> Sentence())
           } else {
             None
           }
