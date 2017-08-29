@@ -20,7 +20,7 @@ import scala.collection.mutable.ArrayBuffer
 import scala.io.Source
 
 @SerialVersionUID(1L)
-class MLSentenceSegmenter(inf: MLSentenceSegmenter.ClassificationInference) extends SentenceSegmenter with Serializable {
+case class MLSentenceSegmenter(inf: MLSentenceSegmenter.ClassificationInference) extends SentenceSegmenter with Serializable {
   override def apply[In](slab: StringSlab[In]): StringSlab[In with Sentence] = {
     val text = slab.content
     val iter = MLSentenceSegmenter.potentialSentenceBoundariesIterator(text)
