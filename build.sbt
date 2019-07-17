@@ -1,6 +1,6 @@
 import sbt.Keys._
 import Version._
-import com.typesafe.sbt.osgi.SbtOsgi._
+// import com.typesafe.sbt.osgi.SbtOsgi._
 
 lazy val extra = <url>http://scalanlp.org/</url>
   <licenses>
@@ -30,8 +30,7 @@ val VersionRegex = "v([0-9]+.[0-9]+.[0-9]+)-?(.*)?".r
 lazy val commonSettings = Seq(
   organization := "org.scalanlp",
   version := "0.4.4",
-
-/*
+  /*
   git.baseVersion := "0.4",
   // append -SNAPSHOT unless we're on a branch
   git.gitUncommittedChanges := false,//git.gitCurrentTags.value.isEmpty,
@@ -45,16 +44,12 @@ lazy val commonSettings = Seq(
     }
   },
   */
-
   scalaVersion := Version.scala,
   crossScalaVersions := Seq("2.12.1", "2.11.8"),
   libraryDependencies ++= Seq(
     Library.breeze,
     Library.breezeConfig,
     Library.mapdb,
-    Library.tikaParsers % "compile,optional",
-    Library.boilerpipe,
-    Library.nekohtml,
     Library.slf4jSimple,
     Library.commonsLang3,
     Library.jflex,
@@ -68,9 +63,9 @@ lazy val commonSettings = Seq(
   fork := true,
   publishMavenStyle := true,
   pomExtra := extra,
-  publishTo <<= isSnapshot { (v: Boolean) =>
+  publishTo := {
     val nexus = "https://oss.sonatype.org/"
-    if (v)
+    if (isSnapshot.value)
       Some("snapshots" at nexus + "content/repositories/snapshots")
     else
       Some("releases" at nexus + "service/local/staging/deploy/maven2")
@@ -90,8 +85,11 @@ lazy val commonSettings = Seq(
       case Some((2, scalaMajor)) if scalaMajor >= 11 => Seq("org.scala-lang.modules" %% "scala-xml" % "1.0.6")
       case _ => Seq.empty
       })
-
-  ) ++ sbtjflex.SbtJFlexPlugin.jflexSettings ++ net.virtualvoid.sbt.graph.Plugin.graphSettings ++
+  ) ++ sbtjflex.SbtJFlexPlugin.jflexSettings
+  // ++ net.virtualvoid.sbt.graph.Plugin.graphSettings
+  
+  // TODO rewrite in sbt 1.x syntax
+  /* ++
   IndexedSeq (
       mergeStrategy in assembly <<= (mergeStrategy in assembly) { (old) =>
         {
@@ -102,19 +100,29 @@ lazy val commonSettings = Seq(
           case x => old(x)
          }
       }
-)
-
-
-
+  )*/
 
 lazy val epicCore = project
-  .in(file("."))
+  .in(file("modules/core"))
   //.enablePlugins(GitVersioning)
-  .settings(commonSettings: _*)
+  .settings(commonSettings)
   .settings(
     name := "epic"
     //,
     //OsgiKeys.privatePackage := Seq(),
     //OsgiKeys.importPackage := Seq("org.apache.tika.*; resolution:=optional", "*"),
     //OsgiKeys.exportPackage := Seq("epic.*")
+  )
+
+lazy val epicHtml = project
+  .in(file("modules/html"))
+  .dependsOn(epicCore)
+  .settings(
+    commonSettings,
+    name := "epic-html",
+    libraryDependencies ++= Seq(
+       Library.tikaParsers,
+       Library.boilerpipe,
+       Library.nekohtml,
+    )
   )

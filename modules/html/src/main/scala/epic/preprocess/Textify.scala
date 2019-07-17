@@ -1,6 +1,6 @@
 package epic.preprocess
 
-import java.io.{PrintWriter, FileWriter, File}
+import java.io.{ File, FileWriter, PrintWriter }
 
 /**
  * TODO
@@ -25,5 +25,4 @@ object Textify {
       oo.close()
     }
   }
-
 }

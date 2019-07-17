@@ -7,14 +7,16 @@
 resolvers += Classpaths.sbtPluginReleases
 resolvers += Resolver.url("artifactory", url("http://scalasbt.artifactoryonline.com/scalasbt/sbt-plugin-releases"))(Resolver.ivyStylePatterns)
 
-addSbtPlugin("com.eed3si9n" % "sbt-assembly" % "0.13.0")
+addSbtPlugin("com.eed3si9n" % "sbt-assembly" % "0.14.10")
 
-addSbtPlugin("org.scalanlp" % "sbt-jflex" % "0.3")
+addSbtPlugin("org.scalanlp" % "sbt-jflex" % "0.4")
 
-addSbtPlugin("com.github.mpeltonen" % "sbt-idea" % "1.6.0")
+// addSbtPlugin("com.github.mpeltonen" % "sbt-idea" % "1.6.0")
 
-addSbtPlugin("net.virtual-void" % "sbt-dependency-graph" % "0.7.5")
+addSbtPlugin("net.virtual-void" % "sbt-dependency-graph" % "0.9.2")
 
-addSbtPlugin("com.typesafe.sbt" % "sbt-osgi" % "0.7.0")
+// addSbtPlugin("com.typesafe.sbt" % "sbt-osgi" % "0.7.0")
 
-addSbtPlugin("com.typesafe.sbt" % "sbt-git" % "0.8.5")
+addSbtPlugin("com.typesafe.sbt" % "sbt-git" % "0.9.3")
+
+
