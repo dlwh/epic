@@ -1,5 +1,4 @@
-package epic
-package preprocess
+package epic.preprocess
 
 import java.io.InputStream
 import java.net.URL
@@ -11,9 +10,12 @@ import org.apache.tika.Tika
 import org.apache.tika.io.TikaInputStream
 import org.apache.tika.metadata.Metadata
 import org.apache.tika.parser.html.BoilerpipeContentHandler
-import org.apache.tika.parser.{ParseContext, Parser}
+import org.apache.tika.parser.{ ParseContext, Parser }
 import org.apache.tika.sax.ToTextContentHandler
 import org.xml.sax._
+
+import scala.xml._
+import scala.xml.factory.XMLLoader
 
 /**
  * Just a simple thing for me to learn Tika
@@ -21,9 +23,6 @@ import org.xml.sax._
  * @author dlwh
  **/
 object TextExtractor {
-  if (!hasTika)
-    throw new RuntimeException("Apache Tika is an optional dependency and is not on the classpath")
-
   def extractText(url: URL, extractMainContentOnly: Boolean = true) = loadSlab(url, extractMainContentOnly).content
 
   def loadSlab(url: URL, extractMainContentOnly: Boolean = true) = {
@@ -213,9 +212,6 @@ object TextExtractor {
   import org.xml.sax._
   import org.xml.sax.helpers.DefaultHandler
 
-import scala.xml._
-  import scala.xml.factory.XMLLoader
-
   class Loader extends DefaultHandler with XMLLoader[Elem] {
     val newAdapter = adapter
     def value = newAdapter.rootElem.asInstanceOf[Elem]
@@ -247,15 +243,4 @@ import scala.xml._
       characters(ch, start, length)
     }
   }
-
-  def hasTika = {
-    try {
-      Class.forName(classOf[Tika].getName)
-      true
-    }
-    catch {
-      case _: Any => false
-    }
-  }
-
 }
