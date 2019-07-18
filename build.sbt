@@ -59,7 +59,7 @@ lazy val commonSettings = Seq(
   ),
   scalacOptions ++= Seq("-deprecation", "-language:_", "-optimize"),
   javaOptions += "-Xmx6g",
-  javaOptions += "-Xrunhprof:cpu=samples,depth=12",
+  //javaOptions += "-Xrunhprof:cpu=samples,depth=12",
   fork := true,
   publishMavenStyle := true,
   pomExtra := extra,
