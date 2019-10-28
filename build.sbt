@@ -29,7 +29,7 @@ val VersionRegex = "v([0-9]+.[0-9]+.[0-9]+)-?(.*)?".r
 
 lazy val commonSettings = Seq(
   organization := "org.scalanlp",
-  version := "0.4.4",
+  version := "0.4.5",
   /*
   git.baseVersion := "0.4",
   // append -SNAPSHOT unless we're on a branch
@@ -44,8 +44,7 @@ lazy val commonSettings = Seq(
     }
   },
   */
-  scalaVersion := Version.scala,
-  crossScalaVersions := Seq("2.12.1", "2.11.8"),
+  crossScalaVersions := Seq("2.12.10", "2.11.8"),
   libraryDependencies ++= Seq(
     Library.breeze,
     Library.breezeConfig,
@@ -80,11 +79,7 @@ lazy val commonSettings = Seq(
     "Scala Tools Snapshots" at "http://scala-tools.org/repo-snapshots/",
     "Sonatype Snapshots" at "https://oss.sonatype.org/content/repositories/snapshots/"
   ),
-  libraryDependencies ++= (CrossVersion.partialVersion(scalaVersion.value) match {
-      case Some((2, scalaMajor)) if scalaMajor >= 12 => Seq("org.scala-lang.modules" %% "scala-xml" % "1.0.6")
-      case Some((2, scalaMajor)) if scalaMajor >= 11 => Seq("org.scala-lang.modules" %% "scala-xml" % "1.0.6")
-      case _ => Seq.empty
-      })
+  libraryDependencies ++= Seq("org.scala-lang.modules" %% "scala-xml" % "1.0.6")
   ) ++ sbtjflex.SbtJFlexPlugin.jflexSettings
   // ++ net.virtualvoid.sbt.graph.Plugin.graphSettings
   

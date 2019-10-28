@@ -1,7 +1,6 @@
 import sbt._
 
 object Version {
-  val scala               = "2.11.8"
   val scalaTest           = "3.0.1"
   val breeze              = "0.13"
   val breezeConfig        = "0.9.2"
