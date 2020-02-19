@@ -1,3 +1,7 @@
+# Archived
+
+NLP, like all of AI, has changed *a lot* since I wrote this back in 2012-2014. I don't have the time to maintain this library, much less modernize it. Maybe one day... 
+
 # Epic
 
 (c) 2014 David Hall.
