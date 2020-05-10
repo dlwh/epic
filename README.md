@@ -151,17 +151,17 @@ __AS OF WRITING ONLY MODELS FOR ENGLISH ARE AVAILABLE!__ Write me if you want th
 * Parser
   * English: 
     ```
-    "org.scalanlp" %% "epic-parser-en-span" % "2015.1.25"
+    "org.scalanlp" %% "epic-parser-en-span" % "2015.2.19"
     ```
 * POS Taggers
   * English: 
     ```
-    "org.scalanlp" %% "epic-pos-en" % "2015.1.25"
+    "org.scalanlp" %% "epic-pos-en" % "2015.2.19"
     ```
 * Named Entity Recognizers
   * English: 
     ```
-    "org.scalanlp" %% "epic-ner-en-conll" % "2015.1.25"
+    "org.scalanlp" %% "epic-ner-en-conll" % "2015.2.19"
     ```
 
 There is also a meta-dependency that includes the above three models:
